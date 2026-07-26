@@ -402,7 +402,7 @@ async function main() {
 
         printOuterLine(` ${innerTopBorder} `);
         
-        const deviceIds = Object.keys(devices).sort();
+        const deviceIds = Object.keys(devices);
         deviceIds.forEach((id, index) => {
             devices[id].displayName = `RedFinger ${index + 1}`;
         });
