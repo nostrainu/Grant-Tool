@@ -758,7 +758,7 @@ async function main() {
                 return;
             }
             const num = parseInt(str, 10);
-            const ids = Object.keys(devices).sort();
+            const ids = (config.deviceOrder || []).filter(id => devices[id]);
             if (num && num >= 1 && num <= ids.length) {
                 configuringDevice = devices[ids[num - 1]];
                 selectingDevice = false;
@@ -848,7 +848,7 @@ async function main() {
             lastActionNotice = `${colors.red}[2] KILL command sent to ${onlineDevs.length} online device(s).${colors.reset}`;
             drawUI();
         } else if (key.name === '3') {
-            const ids = Object.keys(devices).sort();
+            const ids = (config.deviceOrder || []).filter(id => devices[id]);
             if (ids.length === 1) {
                 
                 configuringDevice = devices[ids[0]];
