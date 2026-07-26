@@ -1,0 +1,7 @@
+node_modules/
+config.json
+mobile update
+debug_sync.txt
+usernames.json
+*.pid
+*.log
