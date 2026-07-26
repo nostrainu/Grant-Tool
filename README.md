@@ -30,7 +30,11 @@ On your RedFinger phone:
    ```bash
    pkg install python -y && pip install paho-mqtt
    ```
-2. Run **`rejoin.py`**:
+2. Download **`rejoin.py`**:
+   ```bash
+   curl -O https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py
+   ```
+3. Run **`rejoin.py`**:
    ```bash
    python rejoin.py
    ```
