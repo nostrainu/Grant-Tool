@@ -41,11 +41,14 @@ On your RedFinger phone:
    ```bash
    curl -O https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py
    ```
-3. Run **`rejoin.py`**:
+3. Set your **Room Code** (replace `YOUR_ROOM_CODE` with the code shown on your PC Dashboard):
+   ```bash
+   echo '{"connectionCode":"YOUR_ROOM_CODE"}' > config.json
+   ```
+4. Run **`rejoin.py`**:
    ```bash
    python rejoin.py
    ```
-4. When prompted, enter the **Room Code** shown on your PC Dashboard — that's it, you're connected!
 
 ---
 
