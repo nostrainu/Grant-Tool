@@ -57,8 +57,7 @@ if not config.get("connectionCode") or config["connectionCode"] == "YOUR_UNIQUE_
     print("[-] Error: Please configure your unique 'connectionCode' in config.json before running.")
     sys.exit(1)
 if not config.get("placeId") or config["placeId"] == 0:
-    print("[-] Error: Please configure your Roblox 'placeId' in config.json before running.")
-    sys.exit(1)
+    print("[*] Warning: No 'placeId' configured yet. Waiting for PC dashboard to send it...")
 
 connection_code = config["connectionCode"]
 place_id = config["placeId"]
