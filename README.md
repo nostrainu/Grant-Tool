@@ -18,12 +18,9 @@
 ## 🚀 Quick Start
 
 ### 1️⃣ PC Dashboard (Windows)
-1. Install **Node.js** (v16+).
-2. Install dependencies:
-   ```cmd
-   npm install
-   ```
-3. Run **`GrantRejoiner.bat`** to launch the controller terminal!
+1. Install [Node.js](https://nodejs.org/).
+2. Double-click **`GrantRejoiner.bat`**!
+   *(It automatically installs dependencies and sets up configuration on first launch)*
 
 ---
 
