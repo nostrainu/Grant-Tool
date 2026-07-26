@@ -54,8 +54,23 @@ else:
         print(f"[-] Could not write default config.json: {e}")
 
 if not config.get("connectionCode") or config["connectionCode"] == "YOUR_UNIQUE_CONNECTION_CODE" or config["connectionCode"].strip() == "":
-    print("[-] Error: Please configure your unique 'connectionCode' in config.json before running.")
-    sys.exit(1)
+    print(f"{colors['cyan']}[*] No connection code found.{colors['reset']}")
+    print(f"{colors['yellow']}    Enter the Room Code shown on your PC Controller dashboard.{colors['reset']}")
+    try:
+        code = input(f"\n  Room Code: ").strip()
+        if not code:
+            print(f"{colors['red']}[-] No code entered. Exiting.{colors['reset']}")
+            sys.exit(1)
+        config["connectionCode"] = code
+        try:
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
+            print(f"{colors['green']}[+] Connection code saved to config.json!{colors['reset']}")
+        except Exception as e:
+            print(f"{colors['yellow']}[*] Could not save to config.json: {e} (will use code for this session){colors['reset']}")
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n{colors['red']}[-] Cancelled. Exiting.{colors['reset']}")
+        sys.exit(1)
 if not config.get("placeId") or config["placeId"] == 0:
     print("[*] Warning: No 'placeId' configured yet. Waiting for PC dashboard to send it...")
 
