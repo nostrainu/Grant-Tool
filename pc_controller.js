@@ -402,7 +402,19 @@ async function main() {
 
         printOuterLine(` ${innerTopBorder} `);
         
-        const deviceIds = Object.keys(devices);
+        if (!config.deviceOrder) config.deviceOrder = [];
+        const knownIds = Object.keys(devices);
+        let orderChanged = false;
+        knownIds.forEach(id => {
+            if (!config.deviceOrder.includes(id)) {
+                config.deviceOrder.push(id);
+                orderChanged = true;
+            }
+        });
+        if (orderChanged) {
+            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+        }
+        const deviceIds = config.deviceOrder.filter(id => devices[id]);
         deviceIds.forEach((id, index) => {
             devices[id].displayName = `RedFinger ${index + 1}`;
         });
@@ -523,7 +535,7 @@ async function main() {
         process.stdout.write('\u001b[2J\u001b[H');
         
         console.log(`\n ${colors.cyan}╔══════ SELECT DEVICE TO CONFIGURE ═════════════════════════════════════════╗${colors.reset}\n`);
-        const deviceIds = Object.keys(devices).sort();
+        const deviceIds = (config.deviceOrder || []).filter(id => devices[id]);
         deviceIds.forEach((id, index) => {
             console.log(`  [${colors.bold}${index + 1}${colors.reset}] Device ID: ${colors.cyan}${devices[id].displayName}${colors.reset}`);
         });
