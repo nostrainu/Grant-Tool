@@ -220,14 +220,55 @@ def check_self_update():
     except Exception as e:
         log_event(f"Auto-update skipped: {e}")
 
-targeted_packages = []
-is_paused = True
-client_overrides = {}
+targeted_packages = config.get("targetedPackages", [])
+is_paused = config.get("isPaused", True)
+client_overrides = config.get("clientOverrides", {})
 
 log_states = {}
 last_launch_time = {}
 running_states_cache = {}
 user_ids_cache = {}
+
+def phone_cycle_worker():
+    while True:
+        time.sleep(1)
+        if is_paused or not client_overrides:
+            continue
+            
+        now_ts = time.time()
+        for pkg in list(targeted_packages):
+            override = client_overrides.get(pkg, {})
+            if isinstance(override, dict) and override.get("privateServerList"):
+                ps_list = override.get("privateServerList", [])
+                if len(ps_list) > 1:
+                    interval_sec = override.get("cycleIntervalSeconds")
+                    if not interval_sec and override.get("cycleIntervalMinutes"):
+                        interval_sec = int(override.get("cycleIntervalMinutes") * 60)
+                    if not interval_sec:
+                        interval_sec = 120
+                        
+                    last_cycle = override.get("lastCycleTime", 0)
+                    if last_cycle == 0:
+                        override["lastCycleTime"] = now_ts
+                    elif (now_ts - last_cycle) >= interval_sec:
+                        cur_idx = override.get("currentPSIndex", 0)
+                        next_idx = (cur_idx + 1) % len(ps_list)
+                        override["currentPSIndex"] = next_idx
+                        override["lastCycleTime"] = now_ts
+                        
+                        try:
+                            config["clientOverrides"] = client_overrides
+                            with open(config_path, "w") as f:
+                                json.dump(config, f, indent=2)
+                        except Exception:
+                            pass
+                            
+                        pkg_name = user_ids_cache.get(pkg) or pkg.split('.')[-1]
+                        log_event(f"Standalone Cycle: Rotating {pkg_name} to PS #{next_idx + 1}/{len(ps_list)}")
+                        force_stop_roblox(pkg)
+                        time.sleep(2)
+                        launch_roblox(pkg)
+                        send_status()
 
 def protect_process(package_name):
     try:
@@ -440,6 +481,17 @@ def on_message(client, userdata, msg):
             
         if command == "rejoin":
             stop_requested = False
+            client_overrides = payload.get("clientOverrides", client_overrides)
+            try:
+                config["clientOverrides"] = client_overrides
+                config["targetedPackages"] = targeted_packages
+                config["isPaused"] = False
+                if "placeId" in payload: config["placeId"] = payload["placeId"]
+                if "privateServerLink" in payload: config["privateServerLink"] = payload["privateServerLink"]
+                with open(config_path, "w") as f:
+                    json.dump(config, f, indent=2)
+            except Exception:
+                pass
             print(f"{colors['green']}[+]{colors['reset']} Received remote command: REJOIN for {targeted_packages}")
             
             threading.Thread(target=run_rejoin_sequence, args=(payload,), daemon=True).start()
@@ -447,6 +499,12 @@ def on_message(client, userdata, msg):
         elif command == "kill":
             stop_requested = True
             is_paused = True
+            try:
+                config["isPaused"] = True
+                with open(config_path, "w") as f:
+                    json.dump(config, f, indent=2)
+            except Exception:
+                pass
             print(f"{colors['green']}[+]{colors['reset']} Received remote command: KILL")
             for pkg in targeted_packages:
                 force_stop_roblox(pkg)
@@ -457,6 +515,12 @@ def on_message(client, userdata, msg):
         elif command == "stop" or command == "pause":
             stop_requested = True
             is_paused = True
+            try:
+                config["isPaused"] = True
+                with open(config_path, "w") as f:
+                    json.dump(config, f, indent=2)
+            except Exception:
+                pass
             print(f"{colors['yellow']}[*]{colors['reset']} Received remote command: STOP MONITORING")
             log_event("Auto-rejoin monitoring stopped via PC dashboard command.")
             send_status()
@@ -507,10 +571,11 @@ os.system("stty sane")
 print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup...{colors['reset']}")
 for pkg in get_installed_roblox_packages():
     force_stop_roblox(pkg)
-log_event("Startup cleanup completed. Monitoring paused.")
+log_event("Startup cleanup completed.")
 check_self_update()
 
-print(f"{colors['yellow']}[*] Monitoring loop started. Press Ctrl+C to exit.{colors['reset']}")
+threading.Thread(target=phone_cycle_worker, daemon=True).start()
+print(f"{colors['yellow']}[*] Monitoring & Standalone PS Cycle loop started. Press Ctrl+C to exit.{colors['reset']}")
 
 last_status_send = 0
 last_ui_draw = 0
