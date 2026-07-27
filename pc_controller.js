@@ -726,12 +726,14 @@ async function main() {
                     console.log("");
                 }
 
+                const clientInterval = targetOverride.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2;
                 console.log(`  [${colors.bold}1${colors.reset}] Add PS Link`);
                 console.log(`  [${colors.bold}2${colors.reset}] Remove PS Link`);
                 console.log(`  [${colors.bold}3${colors.reset}] Clear All Links for ${targetName}`);
+                console.log(`  [${colors.bold}4${colors.reset}] Set Cycle Interval (Currently: ${clientInterval} min(s))`);
                 console.log(`  [${colors.bold}C${colors.reset}] Done and Back\n`);
 
-                const opt = await askQuestion(` Select option (1-3 or C): `);
+                const opt = await askQuestion(` Select option (1-4 or C): `);
                 if (opt.trim() === '1') {
                     console.log(`\n ${colors.gray}- Enter PS Link (or press Enter to paste from clipboard):${colors.reset}`);
                     const inputLink = await askQuestion(` PS Link: `);
@@ -776,6 +778,18 @@ async function main() {
                     } catch (e) {}
                     console.log(`\n ${colors.yellow}[-] Cleared cycle list for ${targetName}.${colors.reset}`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
+                } else if (opt.trim() === '4') {
+                    const iAns = await askQuestion(`\n Enter rotation interval in minutes for ${targetName} (e.g. 2): `);
+                    const iNum = parseFloat(iAns);
+                    if (!isNaN(iNum) && iNum > 0) {
+                        targetOverride.cycleIntervalMinutes = iNum;
+                        try {
+                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                            updateMobileUpdateFile();
+                        } catch (e) {}
+                        console.log(`\n ${colors.green}[+] Set cycle interval to ${iNum} minute(s) for ${targetName}!${colors.reset}`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
                 } else if (opt.trim().toLowerCase() === 'c') {
                     break;
                 }
@@ -1140,6 +1154,45 @@ async function main() {
             }
         });
 
+        if (!isRejoinerPaused && config.clientOverrides) {
+            let cycleChanged = false;
+            Object.keys(config.clientOverrides).forEach(devKey => {
+                const devObj = config.clientOverrides[devKey];
+                const devInstance = devices[devKey];
+                if (devObj && typeof devObj === 'object' && devInstance && devInstance.state === "ONLINE") {
+                    let deviceNeedsRejoin = false;
+                    Object.keys(devObj).forEach(pkgKey => {
+                        const clientObj = devObj[pkgKey];
+                        if (clientObj && Array.isArray(clientObj.privateServerList) && clientObj.privateServerList.length > 1) {
+                            const clientIntervalMins = clientObj.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2;
+                            const lastTime = clientObj.lastCycleTime ? new Date(clientObj.lastCycleTime) : (lastRejoinTime || now);
+                            const diffMins = (now.getTime() - lastTime.getTime()) / 1000 / 60;
+                            if (diffMins >= clientIntervalMins) {
+                                const curIdx = clientObj.currentPSIndex || 0;
+                                clientObj.currentPSIndex = (curIdx + 1) % clientObj.privateServerList.length;
+                                clientObj.lastCycleTime = now.toISOString();
+                                deviceNeedsRejoin = true;
+                                cycleChanged = true;
+                            }
+                        }
+                    });
+                    if (deviceNeedsRejoin) {
+                        const devOverrides = getOverridesForDevice(devKey);
+                        client.publish(`${controlDevicePrefix}${devKey}`, JSON.stringify({
+                            command: "rejoin",
+                            placeId: config.placeId,
+                            privateServerLink: config.privateServerLink || "",
+                            clientOverrides: devOverrides
+                        }));
+                        lastActionNotice = `${colors.green}[PS Cycle] Rotated server for ${devInstance.displayName}.${colors.reset}`;
+                    }
+                }
+            });
+            if (cycleChanged) {
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+            }
+        }
+
         if (!isRejoinerPaused && config.autoRejoinIntervalMinutes > 0 && lastRejoinTime) {
             const diffMs = now.getTime() - lastRejoinTime.getTime();
             const diffMins = diffMs / 1000 / 60;
@@ -1148,22 +1201,6 @@ async function main() {
                 if (onlineDevs.length > 0) {
                     lastRejoinTime = now;
                     config.lastRejoinTime = lastRejoinTime.toISOString();
-
-                    if (config.clientOverrides) {
-                        Object.keys(config.clientOverrides).forEach(devKey => {
-                            const devObj = config.clientOverrides[devKey];
-                            if (devObj && typeof devObj === 'object') {
-                                Object.keys(devObj).forEach(pkgKey => {
-                                    const clientObj = devObj[pkgKey];
-                                    if (clientObj && Array.isArray(clientObj.privateServerList) && clientObj.privateServerList.length > 1) {
-                                        const curIdx = clientObj.currentPSIndex || 0;
-                                        clientObj.currentPSIndex = (curIdx + 1) % clientObj.privateServerList.length;
-                                    }
-                                });
-                            }
-                        });
-                    }
-
                     try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
                     changed = true;
                     onlineDevs.forEach(dev => {
@@ -1175,7 +1212,7 @@ async function main() {
                             clientOverrides: devOverrides
                         }));
                     });
-                    lastActionNotice = `${colors.green}[Auto-Rejoin & PS Cycle] Triggered for ${onlineDevs.length} device(s).${colors.reset}`;
+                    lastActionNotice = `${colors.green}[Auto-Rejoin] Triggered for ${onlineDevs.length} device(s).${colors.reset}`;
                 } else {
                     lastActionNotice = `${colors.yellow}[Auto-Rejoin] Timer due (${config.autoRejoinIntervalMinutes}m), waiting for device to reconnect...${colors.reset}`;
                 }
