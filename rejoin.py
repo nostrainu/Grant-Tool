@@ -446,10 +446,10 @@ def run_rejoin_sequence(payload):
             send_status()
         
     if not stop_requested:
+        is_paused = False
         log_event("All targeted packages launched successfully. Monitoring active.")
         update_running_states_cache()
         send_status()
-        is_paused = False
 
 def on_message(client, userdata, msg):
     global place_id, private_server_link, is_paused, client_overrides, stop_requested
@@ -550,6 +550,7 @@ disconnect_keywords = [
 ]
 
 last_status_send = 0
+last_ui_draw = 0
 RESTART_COOLDOWN = 60
 
 start_logcat_thread()
@@ -589,6 +590,10 @@ try:
             if len(targeted_packages) > 0 and all(check_roblox_running(p) for p in targeted_packages):
                 if "Killing" in last_logged_event or "Launching" in last_logged_event or "Auto-restart" in last_logged_event:
                     log_event("All targeted packages are running. Monitoring active.")
+
+        if now - last_ui_draw >= 10:
+            draw_termux_ui()
+            last_ui_draw = now
 
         time.sleep(0.5)
 
