@@ -1073,6 +1073,19 @@ async function main() {
                 return;
             }
             if (key.name === 'r') {
+                isRejoinerPaused = false;
+                config.rejoinerActive = true;
+                const rNow = new Date();
+                lastRejoinTime = rNow;
+                config.lastRejoinTime = rNow.toISOString();
+                if (config.clientOverrides && config.clientOverrides[configuringDevice.deviceId]) {
+                    const devObj = config.clientOverrides[configuringDevice.deviceId];
+                    Object.keys(devObj).forEach(pKey => {
+                        if (devObj[pKey]) devObj[pKey].lastCycleTime = rNow.toISOString();
+                    });
+                }
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+
                 const devOverrides = getOverridesForDevice(configuringDevice.deviceId);
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
                     command: "rejoin",
@@ -1080,7 +1093,7 @@ async function main() {
                     privateServerLink: config.privateServerLink || "",
                     clientOverrides: devOverrides
                 }));
-                lastActionNotice = `${colors.green}[R] REJOIN sent to ${configuringDevice.displayName} only.${colors.reset}`;
+                lastActionNotice = `${colors.green}[R] REJOIN command sent to ${configuringDevice.displayName}.${colors.reset}`;
                 configuringDevice = null;
                 drawUI();
                 return;
