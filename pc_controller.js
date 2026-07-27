@@ -516,13 +516,21 @@ async function main() {
                     }
                     
                     const displayName = getDisplayName(pkg, userId);
-                    let psTag = "";
+                    let psTagText = "";
+                    let psTagFormatted = "";
                     const rawClientObj = (config.clientOverrides && config.clientOverrides[id] && config.clientOverrides[id][pkg]) || {};
                     if (Array.isArray(rawClientObj.privateServerList) && rawClientObj.privateServerList.length > 0) {
                         const idx = (rawClientObj.currentPSIndex || 0) + 1;
-                        psTag = ` ${colors.magenta}(PS #${idx}/${rawClientObj.privateServerList.length})${colors.reset}`;
+                        psTagText = ` (PS #${idx}/${rawClientObj.privateServerList.length})`;
+                        psTagFormatted = ` ${colors.magenta}(PS #${idx}/${rawClientObj.privateServerList.length})${colors.reset}`;
                     }
-                    const colorLine = `       ${checkMark} ${(displayName + psTag).padEnd(24)} - ${statusColor}[${statusText}]${colors.reset}`;
+
+                    const labelText = displayName + psTagText;
+                    const targetWidth = 32;
+                    const padLength = Math.max(1, targetWidth - labelText.length);
+                    const paddedLabel = displayName + psTagFormatted + " ".repeat(padLength);
+
+                    const colorLine = `       ${checkMark} ${paddedLabel} - ${statusColor}[${statusText}]${colors.reset}`;
                     printInnerLine(colorLine);
                 });
                 if (index < deviceIds.length - 1) {
