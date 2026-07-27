@@ -1100,10 +1100,13 @@ async function main() {
                 return;
             }
             if (key.name === 'k') {
+                isRejoinerPaused = true;
+                config.rejoinerActive = false;
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
                     command: "kill"
                 }));
-                lastActionNotice = `${colors.red}[K] KILL sent to ${configuringDevice.displayName} only.${colors.reset}`;
+                lastActionNotice = `${colors.red}[K] KILL sent to ${configuringDevice.displayName} (PAUSED).${colors.reset}`;
                 configuringDevice = null;
                 drawUI();
                 return;
