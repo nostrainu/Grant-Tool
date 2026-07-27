@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import sys
 import time
@@ -137,7 +138,7 @@ def draw_termux_ui():
         print(f" {colors['cyan']}╔══════ Grant Mobile ════════════════════════╗{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<29} {colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<29}{colors['reset']} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}╚══════════════════════════════�        installed = get_installed_roblox_packages()
+        print(f" {colors['cyan']}╚══════════════════════════════�        installed = get_installed_roblox_packages()
         if installed:
             # Calculate max label width dynamically for 100% straight alignment
             max_label_w = 26
