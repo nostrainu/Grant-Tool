@@ -1122,6 +1122,16 @@ async function main() {
             lastRejoinTime = new Date();
             config.rejoinerActive = true;
             config.lastRejoinTime = lastRejoinTime.toISOString();
+            if (config.clientOverrides) {
+                Object.keys(config.clientOverrides).forEach(dKey => {
+                    const dObj = config.clientOverrides[dKey];
+                    if (dObj && typeof dObj === 'object') {
+                        Object.keys(dObj).forEach(pKey => {
+                            if (dObj[pKey]) dObj[pKey].lastCycleTime = lastRejoinTime.toISOString();
+                        });
+                    }
+                });
+            }
             try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
             const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
             onlineDevs.forEach(dev => {
