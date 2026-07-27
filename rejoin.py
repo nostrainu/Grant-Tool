@@ -176,7 +176,8 @@ RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/re
 
 def check_self_update():
     try:
-        cmd = ["curl", "-sL", "--connect-timeout", "5", RAW_GITHUB_URL]
+        cache_buster_url = f"{RAW_GITHUB_URL}?t={int(time.time())}"
+        cmd = ["curl", "-sL", "--connect-timeout", "5", cache_buster_url]
         remote_code = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8', errors='ignore')
         
         script_path = os.path.realpath(__file__)
