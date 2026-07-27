@@ -292,7 +292,9 @@ def logcat_listener():
                     handle_disconnect_event(pkg, msg)
 
 def start_logcat_thread():
-    pass
+    t = threading.Thread(target=logcat_listener, daemon=True)
+    t.start()
+    print(f"{colors['green']}[+]{colors['reset']} Logcat listener thread started.")
 
 def check_roblox_running(package_name):
     return running_states_cache.get(package_name, False)
@@ -508,7 +510,8 @@ def send_status():
         "logTime": last_log_time,
         "placeId": place_id,
         "installedClients": get_installed_roblox_packages(),
-        "activeClients": targeted_packages
+        "activeClients": targeted_packages,
+        "isPaused": is_paused
     }
     try:
         mqtt_client.publish(status_topic, json.dumps(status_payload))
@@ -547,6 +550,7 @@ disconnect_keywords = [
 ]
 
 last_status_send = 0
+RESTART_COOLDOWN = 60
 
 start_logcat_thread()
 
@@ -571,9 +575,20 @@ try:
             last_status_send = now
 
         if not is_paused:
+            for pkg in targeted_packages:
+                if not check_roblox_running(pkg):
+                    last_launch = last_launch_time.get(pkg, 0)
+                    if now - last_launch >= RESTART_COOLDOWN:
+                        log_event(f"Auto-restart: {pkg} found stopped, relaunching...")
+                        print(f"{colors['red']}[!]{colors['reset']} {last_logged_event}")
+                        force_stop_roblox(pkg)
+                        time.sleep(3)
+                        launch_roblox(pkg)
+                        update_running_states_cache()
+                        send_status()
             if len(targeted_packages) > 0 and all(check_roblox_running(p) for p in targeted_packages):
-                if "Killing" in last_logged_event or "Launching" in last_logged_event:
-                    log_event("All targeted packages are running. Periodic rejoin active.")
+                if "Killing" in last_logged_event or "Launching" in last_logged_event or "Auto-restart" in last_logged_event:
+                    log_event("All targeted packages are running. Monitoring active.")
 
         time.sleep(0.5)
 
