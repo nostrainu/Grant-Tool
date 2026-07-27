@@ -182,7 +182,7 @@ function askQuestion(query) {
 }
 
 async function runInteractiveSetup() {
-    drawHeader();
+    console.clear();
     console.log(` ${colors.yellow}[*] Initial configuration setup needed...${colors.reset}\n`);
 
     let code = config.connectionCode;
