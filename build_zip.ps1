@@ -12,7 +12,7 @@ Copy-Item (Join-Path $root "package.json") $staging
 Copy-Item (Join-Path $root "rejoin.py") $staging
 Copy-Item (Join-Path $root "mobile update") $staging
 
-$zipPath = Join-Path $root "Grant-v1.0.zip"
+$zipPath = Join-Path $root "Grant-v2.0.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $zipPath
 
