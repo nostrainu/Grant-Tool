@@ -135,10 +135,10 @@ def draw_termux_ui():
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
         status_color = colors['yellow'] if is_paused else colors['green']
 
-        print(f" {colors['cyan']}╔══════ Grant Mobile ════════════════════════╗{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<29} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<29}{colors['reset']} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}╚══════════════════════════════�        installed = get_installed_roblox_packages()
+        print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<29} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<29}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550u        installed = get_installed_roblox_packages()
         if installed:
             # Calculate max label width dynamically for 100% straight alignment
             max_label_w = 26
@@ -205,7 +205,7 @@ def draw_termux_ui():
         if recent_logs:
             for item in recent_logs:
                 clean_item = item if len(item) <= 42 else item[:39] + "..."
-                print(f"   {colors['green']}•{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
+                print(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
         else:
             print(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
     except Exception:
