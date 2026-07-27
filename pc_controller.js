@@ -825,36 +825,44 @@ async function main() {
                 } else if (opt.trim() === '4') {
                     console.log(`\n ${colors.cyan}--- SET CYCLE INTERVAL ---${colors.reset}`);
                     console.log(` ${colors.gray}Format examples:${colors.reset}`);
-                    console.log(`  - Type ${colors.yellow}30s${colors.reset} for 30 seconds`);
+                    console.log(`  - Type ${colors.yellow}1m 30s${colors.reset} or ${colors.yellow}1m30s${colors.reset} for 1 minute & 30 seconds`);
                     console.log(`  - Type ${colors.yellow}90s${colors.reset} for 90 seconds`);
                     console.log(`  - Type ${colors.yellow}2m${colors.reset} or ${colors.yellow}2${colors.reset} for 2 minutes`);
                     
                     const iAns = await askQuestion(`\n Enter rotation interval for ${targetName}: `);
                     const trimmed = iAns.trim().toLowerCase();
-                    if (trimmed.endsWith('s')) {
-                        const num = parseFloat(trimmed.slice(0, -1));
-                        if (!isNaN(num) && num > 0) {
-                            targetOverride.cycleIntervalSeconds = Math.round(num);
-                            targetOverride.cycleIntervalMinutes = Math.round((num / 60) * 100) / 100;
-                            try {
-                                fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-                                updateMobileUpdateFile();
-                            } catch (e) {}
-                            console.log(`\n ${colors.green}[+] Set cycle interval to ${targetOverride.cycleIntervalSeconds} second(s) for ${targetName}!${colors.reset}`);
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        }
+                    
+                    let totalSecs = 0;
+                    const mMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?/);
+                    const sMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?/);
+                    
+                    if (mMatch || sMatch) {
+                        if (mMatch) totalSecs += parseFloat(mMatch[1]) * 60;
+                        if (sMatch) totalSecs += parseFloat(sMatch[1]);
                     } else {
-                        const num = parseFloat(trimmed.replace(/m$/, ''));
-                        if (!isNaN(num) && num > 0) {
-                            targetOverride.cycleIntervalSeconds = Math.round(num * 60);
-                            targetOverride.cycleIntervalMinutes = num;
-                            try {
-                                fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-                                updateMobileUpdateFile();
-                            } catch (e) {}
-                            console.log(`\n ${colors.green}[+] Set cycle interval to ${num} minute(s) (${targetOverride.cycleIntervalSeconds} seconds) for ${targetName}!${colors.reset}`);
-                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        const num = parseFloat(trimmed);
+                        if (!isNaN(num) && num > 0) totalSecs = Math.round(num * 60);
+                    }
+
+                    if (totalSecs > 0) {
+                        targetOverride.cycleIntervalSeconds = Math.round(totalSecs);
+                        targetOverride.cycleIntervalMinutes = Math.round((totalSecs / 60) * 100) / 100;
+                        try {
+                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                            updateMobileUpdateFile();
+                        } catch (e) {}
+                        
+                        let dispStr = "";
+                        if (targetOverride.cycleIntervalSeconds < 60) {
+                            dispStr = `${targetOverride.cycleIntervalSeconds} second(s)`;
+                        } else {
+                            const m = Math.floor(targetOverride.cycleIntervalSeconds / 60);
+                            const s = targetOverride.cycleIntervalSeconds % 60;
+                            dispStr = s > 0 ? `${m}m ${s}s` : `${m} minute(s)`;
                         }
+                        
+                        console.log(`\n ${colors.green}[+] Set cycle interval to ${dispStr} for ${targetName}!${colors.reset}`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
                 } else if (opt.trim().toLowerCase() === 'c') {
                     try {
