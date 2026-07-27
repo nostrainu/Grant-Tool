@@ -170,6 +170,27 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
+def check_self_update():
+    try:
+        req = urllib.request.Request(RAW_GITHUB_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            remote_code = resp.read().decode('utf-8')
+        
+        script_path = os.path.realpath(__file__)
+        with open(script_path, 'r', encoding='utf-8') as f:
+            local_code = f.read()
+            
+        if remote_code and len(remote_code) > 500 and remote_code.strip() != local_code.strip():
+            log_event("New update detected! Restarting...")
+            with open(script_path, 'w', encoding='utf-8') as f:
+                f.write(remote_code)
+            time.sleep(1)
+            os.execv(sys.executable, [sys.executable, script_path])
+        else:
+            log_event("rejoin.py is up to date.")
+    except Exception as e:
+        log_event(f"Auto-update check skipped.")
+
 targeted_packages = []
 is_paused = True
 client_overrides = {}
@@ -533,6 +554,7 @@ print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup
 for pkg in get_installed_roblox_packages():
     force_stop_roblox(pkg)
 log_event("Startup cleanup completed. Monitoring paused.")
+check_self_update()
 
 print(f"{colors['yellow']}[*] Monitoring loop started. Press Ctrl+C to exit.{colors['reset']}")
 
