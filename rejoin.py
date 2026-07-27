@@ -368,12 +368,18 @@ def launch_roblox(package_name):
     if 'client_overrides' in globals() and client_overrides and package_name in client_overrides:
         override = client_overrides[package_name]
         pkg_place_id = override.get("placeId", pkg_place_id)
-        pkg_link = override.get("privateServerLink", pkg_link)
+        ps_list = override.get("privateServerList", [])
+        if ps_list and len(ps_list) > 0:
+            cur_idx = override.get("currentPSIndex", 0) or 0
+            cur_idx = cur_idx % len(ps_list)
+            pkg_link = ps_list[cur_idx]
+        else:
+            pkg_link = override.get("privateServerLink", pkg_link)
 
     link = pkg_link.strip() if pkg_link else ""
     if link:
         url = link
-        log_event(f"Launching {package_name} via Private Server Link...")
+        log_event(f"Launching {package_name} via PS link...")
     else:
         url = f"roblox://placeId={pkg_place_id}"
         log_event(f"Launching {package_name} to Place ID: {pkg_place_id}...")
@@ -463,6 +469,12 @@ def run_rejoin_sequence(payload):
         
     if not stop_requested:
         is_paused = False
+        try:
+            config["isPaused"] = False
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
+        except Exception:
+            pass
         log_event("All targeted packages launched successfully. Monitoring active.")
         update_running_states_cache()
         send_status()
@@ -568,10 +580,13 @@ except Exception as e:
 mqtt_client.loop_start()
 
 os.system("stty sane")
-print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup...{colors['reset']}")
-for pkg in get_installed_roblox_packages():
-    force_stop_roblox(pkg)
-log_event("Startup cleanup completed.")
+if is_paused:
+    print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup...{colors['reset']}")
+    for pkg in get_installed_roblox_packages():
+        force_stop_roblox(pkg)
+    log_event("Startup cleanup completed.")
+else:
+    log_event("Standalone cycle active. Skipping cleanup.")
 check_self_update()
 
 threading.Thread(target=phone_cycle_worker, daemon=True).start()
