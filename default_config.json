@@ -1,0 +1,10 @@
+{
+  "connectionCode": "YOUR_UNIQUE_CONNECTION_CODE",
+  "placeId": 0,
+  "privateServerLink": "",
+  "brokerUrl": "mqtt://broker.hivemq.com",
+  "autoRejoinIntervalMinutes": 0,
+  "clientOverrides": {},
+  "deviceTargets": {},
+  "rejoinerActive": false
+}
