@@ -25,8 +25,6 @@ let config = {};
 let lastRejoinTime = null;
 let isRejoinerPaused = true;
 let lastActionNotice = "Dashboard ready.";
-let pendingRejoin = false;
-let mqttConnected = false;
 
 function updateMobileUpdateFile() {
     try {
@@ -640,25 +638,12 @@ async function main() {
     const client = mqtt.connect(brokerUrl);
 
     client.on('connect', () => {
-        mqttConnected = true;
         client.subscribe(discoveryTopic);
         client.subscribe(statusTopicWildcard, (err) => {
             if (!err) {
                 drawUI();
             }
         });
-    });
-
-    client.on('offline', () => {
-        mqttConnected = false;
-        if (!selectingDevice && !configuringDevice && !updatingConfig) drawUI();
-    });
-
-    client.on('reconnect', () => {
-        mqttConnected = false;
-    });
-
-    client.on('error', (err) => {
     });
 
     client.on('message', (topic, message) => {
@@ -670,7 +655,6 @@ async function main() {
             if (topic === discoveryTopic) {
                 const savedTargets = config.deviceTargets && config.deviceTargets[deviceId];
                 const activeList = savedTargets ? [...savedTargets] : [...(payload.installedClients || [])];
-                const wasOffline = devices[deviceId] && devices[deviceId].state !== "ONLINE";
 
                 if (!devices[deviceId]) {
                     const idx = Object.keys(devices).length + 1;
@@ -696,10 +680,6 @@ async function main() {
                     }
                     devices[deviceId].lastSeen = new Date();
                     devices[deviceId].state = "ONLINE";
-                }
-
-                if (pendingRejoin && !isRejoinerPaused) {
-                    flushPendingRejoin(client, controlDevicePrefix);
                 }
             }
             
@@ -749,10 +729,6 @@ async function main() {
                             }
                         }
                     }
-                }
-
-                if (pendingRejoin && !isRejoinerPaused) {
-                    flushPendingRejoin(client, controlDevicePrefix);
                 }
             }
 
@@ -923,26 +899,6 @@ async function main() {
 
     process.stdin.on('keypress', keypressHandler);
 
-    function flushPendingRejoin(mqttClient, ctrlPrefix) {
-        const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
-        if (onlineDevs.length === 0) return;
-        pendingRejoin = false;
-        lastRejoinTime = new Date();
-        config.lastRejoinTime = lastRejoinTime.toISOString();
-        try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
-        onlineDevs.forEach(dev => {
-            const devOverrides = getOverridesForDevice(dev.deviceId);
-            mqttClient.publish(`${ctrlPrefix}${dev.deviceId}`, JSON.stringify({
-                command: "rejoin",
-                placeId: config.placeId,
-                privateServerLink: config.privateServerLink || "",
-                clientOverrides: devOverrides
-            }));
-        });
-        lastActionNotice = `${colors.green}[AUTO] Pending rejoin sent to ${onlineDevs.length} device(s) after reconnect.${colors.reset}`;
-        if (!selectingDevice && !configuringDevice && !updatingConfig) drawUI();
-    }
-
     setInterval(() => {
         const now = new Date();
         let changed = false;
@@ -966,7 +922,6 @@ async function main() {
                     lastRejoinTime = now;
                     config.lastRejoinTime = lastRejoinTime.toISOString();
                     try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
-                    pendingRejoin = false;
                     changed = true;
                     onlineDevs.forEach(dev => {
                         const devOverrides = getOverridesForDevice(dev.deviceId);
@@ -977,9 +932,6 @@ async function main() {
                             clientOverrides: devOverrides
                         }));
                     });
-                } else {
-                    pendingRejoin = true;
-                    changed = true;
                 }
             }
         }
