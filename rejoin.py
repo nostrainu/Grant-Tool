@@ -174,10 +174,8 @@ def log_event(msg):
 
 def check_self_update():
     try:
-        req = urllib.request.Request(RAW_GITHUB_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        ctx = ssl._create_unverified_context()
-        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
-            remote_code = resp.read().decode('utf-8')
+        cmd = ["curl", "-sL", "--connect-timeout", "5", RAW_GITHUB_URL]
+        remote_code = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8', errors='ignore')
         
         script_path = os.path.realpath(__file__)
         with open(script_path, 'r', encoding='utf-8') as f:
