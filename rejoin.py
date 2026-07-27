@@ -196,8 +196,6 @@ def draw_termux_ui():
                 pad_len = max(1, target_w - len(label_raw))
                 label_padded = f"{colors['bold']}{disp_name}{colors['reset']}{cycle_tag_fmt} {colors['gray']}({pkg_short}){colors['reset']}" + " " * pad_len
                 
-                print(f"   {target_str} {label_padded} - {status_str}")_tag_fmt} {colors['gray']}({pkg_short}){colors['reset']}" + " " * pad_len
-                
                 print(f"   {target_str} {label_padded} - {status_str}")
         else:
             print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
