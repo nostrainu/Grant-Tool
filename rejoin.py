@@ -151,7 +151,8 @@ def draw_termux_ui():
                 disp_name = uid if uid and uid != "Unknown" else pkg
                 pkg_short = pkg.split('.')[-1]
                 
-                cycle_tag = ""
+                cycle_tag_text = ""
+                cycle_tag_fmt = ""
                 override = client_overrides.get(pkg, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
                 if isinstance(override, dict) and override.get("privateServerList"):
                     ps_list = override.get("privateServerList", [])
@@ -168,11 +169,18 @@ def draw_termux_ui():
                             else:
                                 m = interval_sec / 60
                                 t_str = f"{int(m)}m" if m.is_integer() else f"{m:.1f}m"
-                            cycle_tag = f" {colors['magenta']}[PS #{idx}/{total} | {t_str}]{colors['reset']}"
+                            cycle_tag_text = f" [PS #{idx}/{total} | {t_str}]"
+                            cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total} | {t_str}]{colors['reset']}"
                         else:
-                            cycle_tag = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
+                            cycle_tag_text = f" [PS #{idx}/{total}]"
+                            cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
                             
-                print(f"   {target_str} {colors['bold']}{disp_name}{colors['reset']}{cycle_tag} {colors['gray']}({pkg_short}){colors['reset']} - {status_str}")
+                label_raw = f"{disp_name}{cycle_tag_text} ({pkg_short})"
+                target_w = 34
+                pad_len = max(1, target_w - len(label_raw))
+                label_padded = f"{colors['bold']}{disp_name}{colors['reset']}{cycle_tag_fmt} {colors['gray']}({pkg_short}){colors['reset']}" + " " * pad_len
+                
+                print(f"   {target_str} {label_padded} - {status_str}")
         else:
             print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
