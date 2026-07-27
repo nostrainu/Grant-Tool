@@ -142,7 +142,6 @@ def draw_termux_ui():
 
         installed = get_installed_roblox_packages()
         if installed:
-            # Calculate max label width dynamically for 100% straight alignment
             max_label_w = 26
             for p in installed:
                 p_uid = user_ids_cache.get(p, "Unknown")
