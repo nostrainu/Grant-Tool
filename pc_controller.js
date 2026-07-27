@@ -564,8 +564,10 @@ async function main() {
             console.log(`  [${colors.bold}${index + 1}${colors.reset}] ${check} ${displayName.padEnd(25)}${customTag}`);
         });
         console.log(`\n  [${colors.bold}P${colors.reset}] Configure Custom Private Server Link for a Client`);
+        console.log(`  [${colors.bold}R${colors.reset}] Rejoin this device only`);
+        console.log(`  [${colors.bold}K${colors.reset}] Kill this device only`);
         console.log(`  [${colors.bold}C${colors.reset}] Save targets and return\n`);
-        console.log(" Press number keys (1-4) to toggle targets, 'P' to set Custom PS, or 'C' to save & return...");
+        console.log(" Press number keys (1-4) to toggle targets, 'R' rejoin, 'K' kill, 'P' custom PS, or 'C' to save & return...");
     }
 
     async function configureCustomPrivateServerLink() {
@@ -790,8 +792,30 @@ async function main() {
                 drawUI();
                 return;
             }
-            if (key.name === 'p' || key.name === 'P') {
+            if (key.name === 'p') {
                 configureCustomPrivateServerLink();
+                return;
+            }
+            if (key.name === 'r') {
+                const devOverrides = getOverridesForDevice(configuringDevice.deviceId);
+                client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
+                    command: "rejoin",
+                    placeId: config.placeId,
+                    privateServerLink: config.privateServerLink || "",
+                    clientOverrides: devOverrides
+                }));
+                lastActionNotice = `${colors.green}[R] REJOIN sent to ${configuringDevice.displayName} only.${colors.reset}`;
+                configuringDevice = null;
+                drawUI();
+                return;
+            }
+            if (key.name === 'k') {
+                client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
+                    command: "kill"
+                }));
+                lastActionNotice = `${colors.red}[K] KILL sent to ${configuringDevice.displayName} only.${colors.reset}`;
+                configuringDevice = null;
+                drawUI();
                 return;
             }
             const num = parseInt(str, 10);
