@@ -7,6 +7,8 @@ import subprocess
 import paho.mqtt.client as mqtt
 import threading
 import re
+import urllib.request
+import ssl
 
 pid_file = "rejoin.pid"
 if os.path.exists(pid_file):
@@ -173,7 +175,8 @@ def log_event(msg):
 def check_self_update():
     try:
         req = urllib.request.Request(RAW_GITHUB_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        ctx = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
             remote_code = resp.read().decode('utf-8')
         
         script_path = os.path.realpath(__file__)
@@ -189,7 +192,7 @@ def check_self_update():
         else:
             log_event("rejoin.py is up to date.")
     except Exception as e:
-        log_event(f"Auto-update check skipped.")
+        log_event(f"Auto-update skipped: {e}")
 
 targeted_packages = []
 is_paused = True
