@@ -150,7 +150,29 @@ def draw_termux_ui():
                 target_str = f"[{colors['green']}X{colors['reset']}]" if is_target else "[ ]"
                 disp_name = uid if uid and uid != "Unknown" else pkg
                 pkg_short = pkg.split('.')[-1]
-                print(f"   {target_str} {colors['bold']}{disp_name:<16}{colors['reset']} {colors['gray']}({pkg_short}){colors['reset']} - {status_str}")
+                
+                cycle_tag = ""
+                override = client_overrides.get(pkg, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
+                if isinstance(override, dict) and override.get("privateServerList"):
+                    ps_list = override.get("privateServerList", [])
+                    if len(ps_list) > 0:
+                        idx = (override.get("currentPSIndex", 0) or 0) + 1
+                        total = len(ps_list)
+                        interval_sec = override.get("cycleIntervalSeconds")
+                        if not interval_sec and override.get("cycleIntervalMinutes"):
+                            interval_sec = int(override.get("cycleIntervalMinutes") * 60)
+                        
+                        if interval_sec:
+                            if interval_sec < 60:
+                                t_str = f"{interval_sec}s"
+                            else:
+                                m = interval_sec / 60
+                                t_str = f"{int(m)}m" if m.is_integer() else f"{m:.1f}m"
+                            cycle_tag = f" {colors['magenta']}[PS #{idx}/{total} | {t_str}]{colors['reset']}"
+                        else:
+                            cycle_tag = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
+                            
+                print(f"   {target_str} {colors['bold']}{disp_name}{colors['reset']}{cycle_tag} {colors['gray']}({pkg_short}){colors['reset']} - {status_str}")
         else:
             print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
