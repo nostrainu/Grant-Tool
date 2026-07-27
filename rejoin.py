@@ -253,62 +253,7 @@ def get_roblox_username_or_id(package_name):
             pass
     return None
 
-def logcat_listener():
-    print(f"{colors['green']}[*]{colors['reset']} Starting real-time Logcat listener...")
-    os.system("su -c 'logcat -c' </dev/null >/dev/null 2>&1")
-    
-    proc = subprocess.Popen(
-        ["su", "-c", "logcat -v brief Roblox:I *:S"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-        text=True,
-        bufsize=1
-    )
-    
-    pid_to_package = {}
-    
-    def refresh_pids():
-        for pkg in get_installed_roblox_packages():
-            try:
-                output = subprocess.check_output(f"su -c 'pidof {pkg}' < /dev/null", shell=True).decode().strip()
-                if output:
-                    for pid in output.split():
-                        pid_to_package[int(pid)] = pkg
-            except Exception:
-                pass
-                
-    refresh_pids()
-    last_pid_refresh = time.time()
-    
-    for line in proc.stdout:
-        now = time.time()
-        if now - last_pid_refresh > 10:
-            refresh_pids()
-            last_pid_refresh = now
-            
-        line_strip = line.strip()
-        if not line_strip:
-            continue
-            
-        m = re.match(r'^[A-Z]/Roblox\s*\(\s*(\d+)\s*\):\s*(.*)$', line_strip)
-        if m:
-            pid = int(m.group(1))
-            msg = m.group(2)
-            
-            pkg = pid_to_package.get(pid)
-            if not pkg:
-                refresh_pids()
-                pkg = pid_to_package.get(pid)
-                
-            if pkg and pkg in targeted_packages:
-                if any(kw in msg.lower() for kw in ["kicked", "disconnect", "connection lost", "error code"]):
-                    handle_disconnect_event(pkg, msg)
 
-def start_logcat_thread():
-    t = threading.Thread(target=logcat_listener, daemon=True)
-    t.start()
-    print(f"{colors['green']}[+]{colors['reset']} Logcat listener thread started.")
 
 def check_roblox_running(package_name):
     return running_states_cache.get(package_name, False)
@@ -372,19 +317,6 @@ def launch_roblox(package_name):
         time.sleep(1)
         send_status()
     protect_process(package_name)
-
-def handle_disconnect_event(package_name, reason):
-    if is_paused:
-        return
-    log_event(f"Disconnect detected for {package_name}: {reason}")
-    print(f"{colors['red']}[!]{colors['reset']} {last_logged_event}")
-    send_status()
-    force_stop_roblox(package_name)
-    for _ in range(5):
-        time.sleep(1)
-        send_status()
-    launch_roblox(package_name)
-    send_status()
 
 def update_targeted_packages(packages):
     global targeted_packages
@@ -551,13 +483,9 @@ check_self_update()
 
 print(f"{colors['yellow']}[*] Monitoring loop started. Press Ctrl+C to exit.{colors['reset']}")
 
-
-
 last_status_send = 0
 last_ui_draw = 0
 RESTART_COOLDOWN = 60
-
-start_logcat_thread()
 
 try:
     while True:
