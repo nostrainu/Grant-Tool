@@ -138,7 +138,7 @@ def draw_termux_ui():
         print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
         print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
         print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
+        print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
@@ -185,10 +185,10 @@ def draw_termux_ui():
                             cycle_tag_len = len(f" [PS #{idx}/{total}]")
                             
                 disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
-                tag_pad = " " * (20 - cycle_tag_len) if cycle_tag_len < 20 else " "
                 pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
+                tag_pad = " " * (20 - cycle_tag_len) if cycle_tag_len < 20 else " "
                 
-                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{tag_pad} {pkg_formatted} - {status_str}")
+                print(f"   {target_str} {disp_padded} {pkg_formatted}{cycle_tag_fmt}{tag_pad} - {status_str}")
         else:
             print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
