@@ -7,3 +7,4 @@ usernames.json
 *.log
 Grant.exe
 *.zip
+build_zip.ps1
