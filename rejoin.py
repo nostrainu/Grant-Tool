@@ -135,29 +135,21 @@ def draw_termux_ui():
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
         status_color = colors['yellow'] if is_paused else colors['green']
 
-        print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<29} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<29}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
         print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
-            max_label_w = 26
+            max_name_w = 18
             for p in installed:
                 p_uid = user_ids_cache.get(p, "Unknown")
                 p_disp = p_uid if p_uid and p_uid != "Unknown" else p
-                p_short = p.split('.')[-1]
-                p_tag_len = 0
-                p_ov = client_overrides.get(p, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
-                if isinstance(p_ov, dict) and p_ov.get("privateServerList"):
-                    ps_l = p_ov.get("privateServerList", [])
-                    if len(ps_l) > 0:
-                        p_tag_len = len(f" [PS #{len(ps_l)}/{len(ps_l)} | 99m 59s]")
-                raw_l = len(f"{p_disp} ({p_short})") + p_tag_len
-                if raw_l > max_label_w:
-                    max_label_w = raw_l
+                if len(p_disp) > max_name_w:
+                    max_name_w = len(p_disp)
             
-            target_w = max_label_w + 2
+            name_w = max_name_w + 1
 
             for pkg in installed:
                 is_run = check_roblox_running(pkg)
@@ -168,8 +160,8 @@ def draw_termux_ui():
                 disp_name = uid if uid and uid != "Unknown" else pkg
                 pkg_short = pkg.split('.')[-1]
                 
-                cycle_tag_text = ""
                 cycle_tag_fmt = ""
+                cycle_tag_len = 0
                 override = client_overrides.get(pkg, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
                 if isinstance(override, dict) and override.get("privateServerList"):
                     ps_list = override.get("privateServerList", [])
@@ -186,17 +178,17 @@ def draw_termux_ui():
                             else:
                                 m = interval_sec / 60
                                 t_str = f"{int(m)}m" if m.is_integer() else f"{m:.1f}m"
-                            cycle_tag_text = f" [PS #{idx}/{total} | {t_str}]"
                             cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total} | {t_str}]{colors['reset']}"
+                            cycle_tag_len = len(f" [PS #{idx}/{total} | {t_str}]")
                         else:
-                            cycle_tag_text = f" [PS #{idx}/{total}]"
                             cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
+                            cycle_tag_len = len(f" [PS #{idx}/{total}]")
                             
-                label_raw = f"{disp_name}{cycle_tag_text} ({pkg_short})"
-                pad_len = max(1, target_w - len(label_raw))
-                label_padded = f"{colors['bold']}{disp_name}{colors['reset']}{cycle_tag_fmt} {colors['gray']}({pkg_short}){colors['reset']}" + " " * pad_len
+                disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
+                tag_pad = " " * (20 - cycle_tag_len) if cycle_tag_len < 20 else " "
+                pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
                 
-                print(f"   {target_str} {label_padded} - {status_str}")
+                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{tag_pad} {pkg_formatted} - {status_str}")
         else:
             print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
