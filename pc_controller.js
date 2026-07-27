@@ -172,16 +172,27 @@ function loadConfig() {
 
 function getOverridesForDevice(deviceId) {
     if (!config.clientOverrides) return {};
-    if (config.clientOverrides[deviceId]) {
-        return config.clientOverrides[deviceId];
+    let rawOverrides = config.clientOverrides[deviceId];
+    if (!rawOverrides) {
+        rawOverrides = {};
+        Object.keys(config.clientOverrides).forEach(k => {
+            if (!k.startsWith('device_')) {
+                rawOverrides[k] = config.clientOverrides[k];
+            }
+        });
     }
-    const legacy = {};
-    Object.keys(config.clientOverrides).forEach(k => {
-        if (!k.startsWith('device_')) {
-            legacy[k] = config.clientOverrides[k];
+    const resolved = {};
+    Object.keys(rawOverrides).forEach(pkg => {
+        const item = rawOverrides[pkg];
+        if (item) {
+            resolved[pkg] = { ...item };
+            if (Array.isArray(item.privateServerList) && item.privateServerList.length > 0) {
+                const idx = (item.currentPSIndex !== undefined && item.currentPSIndex >= 0 && item.currentPSIndex < item.privateServerList.length) ? item.currentPSIndex : 0;
+                resolved[pkg].privateServerLink = item.privateServerList[idx];
+            }
         }
     });
-    return legacy;
+    return resolved;
 }
 
 function askQuestion(query) {
@@ -505,7 +516,13 @@ async function main() {
                     }
                     
                     const displayName = getDisplayName(pkg, userId);
-                    const colorLine = `       ${checkMark} ${displayName.padEnd(24)} - ${statusColor}[${statusText}]${colors.reset}`;
+                    let psTag = "";
+                    const rawClientObj = (config.clientOverrides && config.clientOverrides[id] && config.clientOverrides[id][pkg]) || {};
+                    if (Array.isArray(rawClientObj.privateServerList) && rawClientObj.privateServerList.length > 0) {
+                        const idx = (rawClientObj.currentPSIndex || 0) + 1;
+                        psTag = ` ${colors.magenta}(PS #${idx}/${rawClientObj.privateServerList.length})${colors.reset}`;
+                    }
+                    const colorLine = `       ${checkMark} ${(displayName + psTag).padEnd(24)} - ${statusColor}[${statusText}]${colors.reset}`;
                     printInnerLine(colorLine);
                 });
                 if (index < deviceIds.length - 1) {
@@ -574,7 +591,12 @@ async function main() {
             const displayName = getDisplayName(pkg, userId);
             
             let customTag = "";
-            if (devOverrides[pkg] && devOverrides[pkg].privateServerLink) {
+            const rawOverride = (config.clientOverrides && config.clientOverrides[configuringDevice.deviceId] && config.clientOverrides[configuringDevice.deviceId][pkg]) || {};
+            if (Array.isArray(rawOverride.privateServerList) && rawOverride.privateServerList.length > 0) {
+                const count = rawOverride.privateServerList.length;
+                const idx = (rawOverride.currentPSIndex || 0) + 1;
+                customTag = ` ${colors.magenta}(PS Cycle: #${idx}/${count})${colors.reset}`;
+            } else if (devOverrides[pkg] && devOverrides[pkg].privateServerLink) {
                 const link = devOverrides[pkg].privateServerLink;
                 const shortLink = link.length > 25 ? "..." + link.slice(-20) : link;
                 customTag = ` ${colors.yellow}(Custom PS: ${shortLink})${colors.reset}`;
@@ -582,11 +604,12 @@ async function main() {
 
             console.log(`  [${colors.bold}${index + 1}${colors.reset}] ${check} ${displayName.padEnd(25)}${customTag}`);
         });
-        console.log(`\n  [${colors.bold}P${colors.reset}] Configure Custom Private Server Link for a Client`);
+        console.log(`\n  [${colors.bold}P${colors.reset}] Configure Single Custom Private Server Link`);
+        console.log(`  [${colors.bold}L${colors.reset}] Configure PS Cycle List for a Client`);
         console.log(`  [${colors.bold}R${colors.reset}] Rejoin this device only`);
         console.log(`  [${colors.bold}K${colors.reset}] Kill this device only`);
         console.log(`  [${colors.bold}C${colors.reset}] Save targets and return\n`);
-        console.log(" Press number keys (1-4) to toggle targets, 'R' rejoin, 'K' kill, 'P' custom PS, or 'C' to save & return...");
+        console.log(" Press number keys (1-4) to toggle targets, 'P' single PS, 'L' PS cycle list, 'R' rejoin, 'K' kill, or 'C' to save & return...");
     }
 
     async function configureCustomPrivateServerLink() {
@@ -643,6 +666,122 @@ async function main() {
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
+        if (process.stdin.isTTY) {
+            process.stdin.setRawMode(true);
+            process.stdin.resume();
+        }
+        process.stdout.write('\u001b[?1049h\u001b[?25l');
+        updatingConfig = false;
+        drawClientSelectionMenu();
+    }
+
+    async function configureClientPSCycleList() {
+        if (!configuringDevice) return;
+        updatingConfig = true;
+        process.stdout.write('\u001b[?1049l\u001b[?25h');
+        console.clear();
+        console.log(`\n ${colors.cyan}╔══════ CONFIGURE PS CYCLE LIST FOR CLIENT ══════════════════════════════╗${colors.reset}\n`);
+        
+        configuringDevice.installedClients.forEach((pkg, index) => {
+            const userId = configuringDevice.userIds && configuringDevice.userIds[pkg] ? configuringDevice.userIds[pkg] : "Unknown";
+            const displayName = getDisplayName(pkg, userId);
+            const rawOverride = (config.clientOverrides && config.clientOverrides[configuringDevice.deviceId] && config.clientOverrides[configuringDevice.deviceId][pkg]) || {};
+            const listCount = (Array.isArray(rawOverride.privateServerList)) ? rawOverride.privateServerList.length : 0;
+            const currentTag = listCount > 0 ? ` (${listCount} PS links in cycle)` : " (No cycle list)";
+            console.log(`  [${colors.bold}${index + 1}${colors.reset}] ${displayName.padEnd(25)} ${colors.magenta}${currentTag}${colors.reset}`);
+        });
+        
+        const ans = await askQuestion(`\n Enter client number to manage PS Cycle List (1-${configuringDevice.installedClients.length}), or 'C' to cancel: `);
+        const num = parseInt(ans, 10);
+        if (num && num >= 1 && num <= configuringDevice.installedClients.length) {
+            const targetPkg = configuringDevice.installedClients[num - 1];
+            const userId = configuringDevice.userIds && configuringDevice.userIds[targetPkg] ? configuringDevice.userIds[targetPkg] : "Unknown";
+            const targetName = getDisplayName(targetPkg, userId);
+            
+            if (!config.clientOverrides) config.clientOverrides = {};
+            if (!config.clientOverrides[configuringDevice.deviceId]) config.clientOverrides[configuringDevice.deviceId] = {};
+            if (!config.clientOverrides[configuringDevice.deviceId][targetPkg]) config.clientOverrides[configuringDevice.deviceId][targetPkg] = {};
+            
+            const targetOverride = config.clientOverrides[configuringDevice.deviceId][targetPkg];
+            if (!Array.isArray(targetOverride.privateServerList)) {
+                targetOverride.privateServerList = [];
+            }
+            if (targetOverride.currentPSIndex === undefined) {
+                targetOverride.currentPSIndex = 0;
+            }
+
+            while (true) {
+                console.clear();
+                console.log(`\n ${colors.magenta}--- PS CYCLE LIST: ${targetName} (${configuringDevice.displayName}) ---${colors.reset}`);
+                const list = targetOverride.privateServerList;
+                if (list.length === 0) {
+                    console.log(` ${colors.gray}No PS links in cycle list yet.${colors.reset}\n`);
+                } else {
+                    console.log(` ${colors.cyan}Configured Servers (${list.length} total):${colors.reset}`);
+                    list.forEach((link, i) => {
+                        const activeMarker = i === targetOverride.currentPSIndex ? ` ${colors.green}[ACTIVE]${colors.reset}` : "";
+                        const short = link.length > 50 ? "..." + link.slice(-45) : link;
+                        console.log(`  [${colors.bold}${i + 1}${colors.reset}] ${short}${activeMarker}`);
+                    });
+                    console.log("");
+                }
+
+                console.log(`  [${colors.bold}1${colors.reset}] Add PS Link`);
+                console.log(`  [${colors.bold}2${colors.reset}] Remove PS Link`);
+                console.log(`  [${colors.bold}3${colors.reset}] Clear All Links for ${targetName}`);
+                console.log(`  [${colors.bold}C${colors.reset}] Done and Back\n`);
+
+                const opt = await askQuestion(` Select option (1-3 or C): `);
+                if (opt.trim() === '1') {
+                    console.log(`\n ${colors.gray}- Enter PS Link (or press Enter to paste from clipboard):${colors.reset}`);
+                    const inputLink = await askQuestion(` PS Link: `);
+                    let finalLink = inputLink.trim().replace(/^["']|["']$/g, '').trim();
+                    if (finalLink === "") {
+                        finalLink = getClipboardText().replace(/[\r\n]+/g, "").replace(/^["']|["']$/g, '').trim();
+                    }
+                    if (finalLink.includes("roblox.com") || finalLink.startsWith("http") || finalLink.startsWith("roblox://")) {
+                        targetOverride.privateServerList.push(finalLink);
+                        try {
+                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                            updateMobileUpdateFile();
+                        } catch (e) {}
+                        console.log(`\n ${colors.green}[+] Added PS Link #${targetOverride.privateServerList.length}!${colors.reset}`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else {
+                        console.log(`\n ${colors.red}[!] Invalid PS link format.${colors.reset}`);
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                    }
+                } else if (opt.trim() === '2') {
+                    if (targetOverride.privateServerList.length === 0) continue;
+                    const rAns = await askQuestion(` Enter number to remove (1-${targetOverride.privateServerList.length}): `);
+                    const rNum = parseInt(rAns, 10);
+                    if (rNum && rNum >= 1 && rNum <= targetOverride.privateServerList.length) {
+                        targetOverride.privateServerList.splice(rNum - 1, 1);
+                        if (targetOverride.currentPSIndex >= targetOverride.privateServerList.length) {
+                            targetOverride.currentPSIndex = 0;
+                        }
+                        try {
+                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                            updateMobileUpdateFile();
+                        } catch (e) {}
+                        console.log(`\n ${colors.yellow}[-] Removed link #${rNum}.${colors.reset}`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                } else if (opt.trim() === '3') {
+                    targetOverride.privateServerList = [];
+                    targetOverride.currentPSIndex = 0;
+                    try {
+                        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                        updateMobileUpdateFile();
+                    } catch (e) {}
+                    console.log(`\n ${colors.yellow}[-] Cleared cycle list for ${targetName}.${colors.reset}`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else if (opt.trim().toLowerCase() === 'c') {
+                    break;
+                }
+            }
+        }
+
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(true);
             process.stdin.resume();
@@ -844,6 +983,10 @@ async function main() {
                 configureCustomPrivateServerLink();
                 return;
             }
+            if (key.name === 'l') {
+                configureClientPSCycleList();
+                return;
+            }
             if (key.name === 'r') {
                 const devOverrides = getOverridesForDevice(configuringDevice.deviceId);
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
@@ -1005,6 +1148,22 @@ async function main() {
                 if (onlineDevs.length > 0) {
                     lastRejoinTime = now;
                     config.lastRejoinTime = lastRejoinTime.toISOString();
+
+                    if (config.clientOverrides) {
+                        Object.keys(config.clientOverrides).forEach(devKey => {
+                            const devObj = config.clientOverrides[devKey];
+                            if (devObj && typeof devObj === 'object') {
+                                Object.keys(devObj).forEach(pkgKey => {
+                                    const clientObj = devObj[pkgKey];
+                                    if (clientObj && Array.isArray(clientObj.privateServerList) && clientObj.privateServerList.length > 1) {
+                                        const curIdx = clientObj.currentPSIndex || 0;
+                                        clientObj.currentPSIndex = (curIdx + 1) % clientObj.privateServerList.length;
+                                    }
+                                });
+                            }
+                        });
+                    }
+
                     try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
                     changed = true;
                     onlineDevs.forEach(dev => {
@@ -1016,7 +1175,7 @@ async function main() {
                             clientOverrides: devOverrides
                         }));
                     });
-                    lastActionNotice = `${colors.green}[Auto-Rejoin] Triggered for ${onlineDevs.length} device(s).${colors.reset}`;
+                    lastActionNotice = `${colors.green}[Auto-Rejoin & PS Cycle] Triggered for ${onlineDevs.length} device(s).${colors.reset}`;
                 } else {
                     lastActionNotice = `${colors.yellow}[Auto-Rejoin] Timer due (${config.autoRejoinIntervalMinutes}m), waiting for device to reconnect...${colors.reset}`;
                 }
