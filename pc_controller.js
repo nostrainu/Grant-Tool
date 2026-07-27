@@ -521,12 +521,32 @@ async function main() {
                     const rawClientObj = (config.clientOverrides && config.clientOverrides[id] && config.clientOverrides[id][pkg]) || {};
                     if (Array.isArray(rawClientObj.privateServerList) && rawClientObj.privateServerList.length > 0) {
                         const idx = (rawClientObj.currentPSIndex || 0) + 1;
-                        psTagText = ` (PS #${idx}/${rawClientObj.privateServerList.length})`;
-                        psTagFormatted = ` ${colors.magenta}(PS #${idx}/${rawClientObj.privateServerList.length})${colors.reset}`;
+                        const total = rawClientObj.privateServerList.length;
+                        
+                        let timerStr = "";
+                        if (isRejoinerPaused) {
+                            timerStr = "PAUSED";
+                        } else {
+                            const clientIntervalSecs = rawClientObj.cycleIntervalSeconds || ((rawClientObj.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2) * 60);
+                            const lastTime = rawClientObj.lastCycleTime ? new Date(rawClientObj.lastCycleTime) : (lastRejoinTime || now);
+                            const elapsedSecs = Math.max(0, Math.floor((now.getTime() - lastTime.getTime()) / 1000));
+                            const remainingSecs = Math.max(0, clientIntervalSecs - elapsedSecs);
+                            
+                            if (remainingSecs < 60) {
+                                timerStr = `${remainingSecs}s`;
+                            } else {
+                                const m = Math.floor(remainingSecs / 60);
+                                const s = remainingSecs % 60;
+                                timerStr = `${m}:${s.toString().padStart(2, '0')}`;
+                            }
+                        }
+                        
+                        psTagText = ` (PS #${idx}/${total} | ${timerStr})`;
+                        psTagFormatted = ` ${colors.magenta}(PS #${idx}/${total} | ${colors.yellow}${timerStr}${colors.magenta})${colors.reset}`;
                     }
 
                     const labelText = displayName + psTagText;
-                    const targetWidth = 32;
+                    const targetWidth = 38;
                     const padLength = Math.max(1, targetWidth - labelText.length);
                     const paddedLabel = displayName + psTagFormatted + " ".repeat(padLength);
 
