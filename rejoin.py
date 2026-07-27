@@ -502,12 +502,14 @@ def send_discovery():
         pass
 
 def send_status():
+    latest_launch = max(last_launch_time.values()) if last_launch_time else 0
     status_payload = {
         "deviceId": device_id,
         "runningStates": {pkg: check_roblox_running(pkg) for pkg in get_installed_roblox_packages()},
         "userIds": {pkg: user_ids_cache.get(pkg, "Unknown") for pkg in get_installed_roblox_packages()},
         "log": last_logged_event,
         "logTime": last_log_time,
+        "lastLaunchTime": latest_launch,
         "placeId": place_id,
         "installedClients": get_installed_roblox_packages(),
         "activeClients": targeted_packages,

@@ -20,6 +20,24 @@ function getClipboardText() {
     }
 }
 
+function disableQuickEdit() {
+    if (process.platform === 'win32') {
+        try {
+            const psCmd = `$c=@'
+using System;
+using System.Runtime.InteropServices;
+public class WinCon {
+    [DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int n);
+    [DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr h, out uint m);
+    [DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr h, uint m);
+    public static void Go() { IntPtr h=GetStdHandle(-10); uint m; if(GetConsoleMode(h,out m)){ m&=~0x0040u; m|=0x0080u; SetConsoleMode(h,m); } }
+}
+'@; Add-Type -TypeDefinition $c -ErrorAction SilentlyContinue; [WinCon]::Go()`;
+            execSync(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${psCmd.replace(/\r?\n/g, ' ')}"`, { stdio: 'ignore', timeout: 4000 });
+        } catch (e) {}
+    }
+}
+
 const configPath = path.join(__dirname, 'config.json');
 let config = {};
 let lastRejoinTime = null;
@@ -228,6 +246,7 @@ async function runInteractiveSetup() {
 }
 
 async function main() {
+    disableQuickEdit();
     loadConfig();
 
     const usernamesPath = path.join(__dirname, 'usernames.json');
@@ -637,7 +656,27 @@ async function main() {
     
     drawUI(); 
     
-    const client = mqtt.connect(brokerUrl);
+    const client = mqtt.connect(brokerUrl, {
+        keepalive: 30,
+        reconnectPeriod: 3000,
+        connectTimeout: 10000,
+        resubscribe: true
+    });
+
+    client.on('reconnect', () => {
+        lastActionNotice = `${colors.yellow}[!] Reconnecting to MQTT broker...${colors.reset}`;
+        if (!selectingDevice && !configuringDevice && !updatingConfig) drawUI();
+    });
+
+    client.on('offline', () => {
+        lastActionNotice = `${colors.red}[!] MQTT Broker offline. Reconnecting...${colors.reset}`;
+        if (!selectingDevice && !configuringDevice && !updatingConfig) drawUI();
+    });
+
+    client.on('error', (err) => {
+        lastActionNotice = `${colors.red}[!] MQTT Error: ${err.message}${colors.reset}`;
+        if (!selectingDevice && !configuringDevice && !updatingConfig) drawUI();
+    });
 
     client.on('connect', () => {
         client.subscribe(discoveryTopic);
@@ -712,6 +751,15 @@ async function main() {
                     devices[deviceId].lastLogTime = payload.logTime || devices[deviceId].lastLogTime;
                     devices[deviceId].lastSeen = new Date();
                     devices[deviceId].state = "ONLINE";
+
+                    if (payload.lastLaunchTime && payload.lastLaunchTime > 0) {
+                        const mobileLaunchDate = new Date(payload.lastLaunchTime * 1000);
+                        if (!lastRejoinTime || mobileLaunchDate > lastRejoinTime) {
+                            lastRejoinTime = mobileLaunchDate;
+                            config.lastRejoinTime = lastRejoinTime.toISOString();
+                            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+                        }
+                    }
 
                     if (payload.activeClients) {
                         const pcList = devices[deviceId].activeClients || [];
@@ -931,7 +979,7 @@ async function main() {
 
         deviceIds.forEach((id) => {
             const dev = devices[id];
-            if (dev.state === "ONLINE" && (now.getTime() - dev.lastSeen.getTime() > 15000)) {
+            if (dev.state === "ONLINE" && (now.getTime() - dev.lastSeen.getTime() > 45000)) {
                 dev.state = "OFFLINE";
                 changed = true;
             }
@@ -956,6 +1004,9 @@ async function main() {
                             clientOverrides: devOverrides
                         }));
                     });
+                    lastActionNotice = `${colors.green}[Auto-Rejoin] Triggered for ${onlineDevs.length} device(s).${colors.reset}`;
+                } else {
+                    lastActionNotice = `${colors.yellow}[Auto-Rejoin] Timer due (${config.autoRejoinIntervalMinutes}m), waiting for device to reconnect...${colors.reset}`;
                 }
             }
         }
