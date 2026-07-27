@@ -302,14 +302,7 @@ def logcat_listener():
                 pkg = pid_to_package.get(pid)
                 
             if pkg and pkg in targeted_packages:
-                found_keyword = None
-                for kw in disconnect_keywords:
-                    if kw.lower() in msg.lower():
-                        found_keyword = kw
-                        break
-                if found_keyword:
-                    handle_disconnect_event(pkg, msg)
-                elif "kicked" in msg.lower() or "error code: 267" in msg.lower():
+                if any(kw in msg.lower() for kw in ["kicked", "disconnect", "connection lost", "error code"]):
                     handle_disconnect_event(pkg, msg)
 
 def start_logcat_thread():
@@ -558,20 +551,7 @@ check_self_update()
 
 print(f"{colors['yellow']}[*] Monitoring loop started. Press Ctrl+C to exit.{colors['reset']}")
 
-disconnect_keywords = [
-    "Connection lost", 
-    "clean disconnect", 
-    "Disconnect reason:", 
-    "ConnectionTerminated", 
-    "Lost connection", 
-    "Error Code: 277", 
-    "Error Code: 279", 
-    "Error Code: 268",
-    "uh oh!",
-    "save data",
-    "moderator",
-    "moderation"
-]
+
 
 last_status_send = 0
 last_ui_draw = 0
