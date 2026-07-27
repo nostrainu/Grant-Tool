@@ -734,12 +734,25 @@ async function main() {
                     console.log("");
                 }
 
-                const clientInterval = targetOverride.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2;
+                let clientIntervalStr = "2 min(s)";
+                if (targetOverride.cycleIntervalSeconds) {
+                    if (targetOverride.cycleIntervalSeconds < 60) {
+                        clientIntervalStr = `${targetOverride.cycleIntervalSeconds} sec(s)`;
+                    } else {
+                        const m = targetOverride.cycleIntervalSeconds / 60;
+                        clientIntervalStr = `${Number.isInteger(m) ? m : m.toFixed(1)} min(s)`;
+                    }
+                } else if (targetOverride.cycleIntervalMinutes) {
+                    clientIntervalStr = `${targetOverride.cycleIntervalMinutes} min(s)`;
+                } else if (config.autoRejoinIntervalMinutes > 0) {
+                    clientIntervalStr = `${config.autoRejoinIntervalMinutes} min(s)`;
+                }
+
                 console.log(`  [${colors.bold}1${colors.reset}] Add PS Link`);
                 console.log(`  [${colors.bold}2${colors.reset}] Remove PS Link`);
                 console.log(`  [${colors.bold}3${colors.reset}] Clear All Links for ${targetName}`);
-                console.log(`  [${colors.bold}4${colors.reset}] Set Cycle Interval (Currently: ${clientInterval} min(s))`);
-                console.log(`  [${colors.bold}C${colors.reset}] Done and Back\n`);
+                console.log(`  [${colors.bold}4${colors.reset}] Set Cycle Interval (Currently: ${clientIntervalStr})`);
+                console.log(`  [${colors.bold}C${colors.reset}] Save and Back\n`);
 
                 const opt = await askQuestion(` Select option (1-4 or C): `);
                 if (opt.trim() === '1') {
@@ -780,6 +793,8 @@ async function main() {
                 } else if (opt.trim() === '3') {
                     targetOverride.privateServerList = [];
                     targetOverride.currentPSIndex = 0;
+                    delete targetOverride.cycleIntervalSeconds;
+                    delete targetOverride.cycleIntervalMinutes;
                     try {
                         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                         updateMobileUpdateFile();
@@ -787,18 +802,46 @@ async function main() {
                     console.log(`\n ${colors.yellow}[-] Cleared cycle list for ${targetName}.${colors.reset}`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } else if (opt.trim() === '4') {
-                    const iAns = await askQuestion(`\n Enter rotation interval in minutes for ${targetName} (e.g. 2): `);
-                    const iNum = parseFloat(iAns);
-                    if (!isNaN(iNum) && iNum > 0) {
-                        targetOverride.cycleIntervalMinutes = iNum;
-                        try {
-                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-                            updateMobileUpdateFile();
-                        } catch (e) {}
-                        console.log(`\n ${colors.green}[+] Set cycle interval to ${iNum} minute(s) for ${targetName}!${colors.reset}`);
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    console.log(`\n ${colors.cyan}--- SET CYCLE INTERVAL ---${colors.reset}`);
+                    console.log(` ${colors.gray}Format examples:${colors.reset}`);
+                    console.log(`  - Type ${colors.yellow}30s${colors.reset} for 30 seconds`);
+                    console.log(`  - Type ${colors.yellow}90s${colors.reset} for 90 seconds`);
+                    console.log(`  - Type ${colors.yellow}2m${colors.reset} or ${colors.yellow}2${colors.reset} for 2 minutes`);
+                    
+                    const iAns = await askQuestion(`\n Enter rotation interval for ${targetName}: `);
+                    const trimmed = iAns.trim().toLowerCase();
+                    if (trimmed.endsWith('s')) {
+                        const num = parseFloat(trimmed.slice(0, -1));
+                        if (!isNaN(num) && num > 0) {
+                            targetOverride.cycleIntervalSeconds = Math.round(num);
+                            targetOverride.cycleIntervalMinutes = Math.round((num / 60) * 100) / 100;
+                            try {
+                                fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                                updateMobileUpdateFile();
+                            } catch (e) {}
+                            console.log(`\n ${colors.green}[+] Set cycle interval to ${targetOverride.cycleIntervalSeconds} second(s) for ${targetName}!${colors.reset}`);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                    } else {
+                        const num = parseFloat(trimmed.replace(/m$/, ''));
+                        if (!isNaN(num) && num > 0) {
+                            targetOverride.cycleIntervalSeconds = Math.round(num * 60);
+                            targetOverride.cycleIntervalMinutes = num;
+                            try {
+                                fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                                updateMobileUpdateFile();
+                            } catch (e) {}
+                            console.log(`\n ${colors.green}[+] Set cycle interval to ${num} minute(s) (${targetOverride.cycleIntervalSeconds} seconds) for ${targetName}!${colors.reset}`);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
                     }
                 } else if (opt.trim().toLowerCase() === 'c') {
+                    try {
+                        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                        updateMobileUpdateFile();
+                    } catch (e) {}
+                    console.log(`\n ${colors.green}[+] Saved cycle configurations for ${targetName}!${colors.reset}`);
+                    await new Promise(resolve => setTimeout(resolve, 800));
                     break;
                 }
             }
@@ -1172,10 +1215,10 @@ async function main() {
                     Object.keys(devObj).forEach(pkgKey => {
                         const clientObj = devObj[pkgKey];
                         if (clientObj && Array.isArray(clientObj.privateServerList) && clientObj.privateServerList.length > 1) {
-                            const clientIntervalMins = clientObj.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2;
+                            const clientIntervalSecs = clientObj.cycleIntervalSeconds || ((clientObj.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2) * 60);
                             const lastTime = clientObj.lastCycleTime ? new Date(clientObj.lastCycleTime) : (lastRejoinTime || now);
-                            const diffMins = (now.getTime() - lastTime.getTime()) / 1000 / 60;
-                            if (diffMins >= clientIntervalMins) {
+                            const diffSecs = (now.getTime() - lastTime.getTime()) / 1000;
+                            if (diffSecs >= clientIntervalSecs) {
                                 const curIdx = clientObj.currentPSIndex || 0;
                                 clientObj.currentPSIndex = (curIdx + 1) % clientObj.privateServerList.length;
                                 clientObj.lastCycleTime = now.toISOString();
