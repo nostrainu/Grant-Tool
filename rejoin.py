@@ -137,11 +137,26 @@ def draw_termux_ui():
         print(f" {colors['cyan']}╔══════ Grant Mobile ════════════════════════╗{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<29} {colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<29}{colors['reset']} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}╚════════════════════════════════════════════╝{colors['reset']}\n")
-
-        print(f" {colors['bold']}{colors['cyan']}ACCOUNTS & PROCESS STATUS:{colors['reset']}")
-        installed = get_installed_roblox_packages()
+        print(f" {colors['cyan']}╚══════════════════════════════�        installed = get_installed_roblox_packages()
         if installed:
+            # Calculate max label width dynamically for 100% straight alignment
+            max_label_w = 26
+            for p in installed:
+                p_uid = user_ids_cache.get(p, "Unknown")
+                p_disp = p_uid if p_uid and p_uid != "Unknown" else p
+                p_short = p.split('.')[-1]
+                p_tag_len = 0
+                p_ov = client_overrides.get(p, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
+                if isinstance(p_ov, dict) and p_ov.get("privateServerList"):
+                    ps_l = p_ov.get("privateServerList", [])
+                    if len(ps_l) > 0:
+                        p_tag_len = len(f" [PS #{len(ps_l)}/{len(ps_l)} | 99m 59s]")
+                raw_l = len(f"{p_disp} ({p_short})") + p_tag_len
+                if raw_l > max_label_w:
+                    max_label_w = raw_l
+            
+            target_w = max_label_w + 2
+
             for pkg in installed:
                 is_run = check_roblox_running(pkg)
                 is_target = pkg in targeted_packages
@@ -176,9 +191,10 @@ def draw_termux_ui():
                             cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
                             
                 label_raw = f"{disp_name}{cycle_tag_text} ({pkg_short})"
-                target_w = 34
                 pad_len = max(1, target_w - len(label_raw))
                 label_padded = f"{colors['bold']}{disp_name}{colors['reset']}{cycle_tag_fmt} {colors['gray']}({pkg_short}){colors['reset']}" + " " * pad_len
+                
+                print(f"   {target_str} {label_padded} - {status_str}")_tag_fmt} {colors['gray']}({pkg_short}){colors['reset']}" + " " * pad_len
                 
                 print(f"   {target_str} {label_padded} - {status_str}")
         else:
