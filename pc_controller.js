@@ -419,6 +419,7 @@ async function main() {
 
     function drawUI() {
         console.clear();
+        const now = new Date();
 
         const grantTitle = " Grant ";
         const outerTopBorder = `${colors.yellow}┌${"─".repeat(6)}${colors.reset}${colors.bold}${colors.green}${grantTitle}${colors.reset}${colors.yellow}${"─".repeat(outerWidth - 6 - grantTitle.length)}┐${colors.reset}`;
