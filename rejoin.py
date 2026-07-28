@@ -11,8 +11,6 @@ import re
 import urllib.request
 import ssl
 
-os.system("clear")
-
 colors = {
     "reset": "\033[0m",
     "bold": "\033[1m",
@@ -269,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2031
+SCRIPT_VERSION = 2013
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
