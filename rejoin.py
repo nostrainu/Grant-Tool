@@ -594,6 +594,15 @@ def on_message(client, userdata, msg):
         if command == "rejoin":
             stop_requested = False
             client_overrides = payload.get("clientOverrides", client_overrides)
+            rejoin_ts = payload.get("rejoinTimestamp", time.time())
+            
+            if targeted_packages:
+                for pkg in targeted_packages:
+                    if pkg not in client_overrides or not isinstance(client_overrides[pkg], dict):
+                        client_overrides[pkg] = {}
+                    client_overrides[pkg]["lastCycleTime"] = rejoin_ts
+                    last_launch_time[pkg] = rejoin_ts
+
             try:
                 config["clientOverrides"] = client_overrides
                 config["targetedPackages"] = targeted_packages

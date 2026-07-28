@@ -1195,7 +1195,8 @@ async function main() {
                     placeId: config.placeId,
                     privateServerLink: config.privateServerLink || "",
                     clientOverrides: devOverrides,
-                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
+                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0,
+                    rejoinTimestamp: rNow.getTime() / 1000
                 }));
                 lastActionNotice = `${colors.green}[R] REJOIN command sent to ${configuringDevice.displayName}.${colors.reset}`;
                 configuringDevice = null;
@@ -1261,7 +1262,8 @@ async function main() {
                     placeId: config.placeId,
                     privateServerLink: config.privateServerLink || "",
                     clientOverrides: devOverrides,
-                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
+                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0,
+                    rejoinTimestamp: lastRejoinTime.getTime() / 1000
                 }));
             });
             lastActionNotice = `${colors.green}[1] REJOIN command sent to ${onlineDevs.length} online device(s).${colors.reset}`;
