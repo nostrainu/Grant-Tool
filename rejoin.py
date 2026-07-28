@@ -267,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2013
+SCRIPT_VERSION = 2040
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -491,8 +491,9 @@ def launch_roblox(package_name):
         log_event(f"Launching {package_name} to Place ID: {pkg_place_id}...")
 
     cmd = f'am start -p {package_name} -a android.intent.action.VIEW -d "{url}"'
-    os.system(f"{cmd} >/dev/null 2>&1")
-    os.system(f"su -c '{cmd}' </dev/null >/dev/null 2>&1")
+    res = os.system(f"su -c '{cmd}' </dev/null >/dev/null 2>&1")
+    if res != 0:
+        os.system(f"{cmd} >/dev/null 2>&1")
     os.system("stty sane")
     for _ in range(3):
         time.sleep(1)
