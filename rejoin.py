@@ -416,8 +416,7 @@ def update_running_states_cache():
     running_states_cache = running
 
 def force_stop_roblox(package_name):
-    log_event(f"Killing {package_name}...")
-    print(f"{colors['cyan']}[*]{colors['reset']} Killing process: {package_name}")
+    log_event(f"Killing process: {package_name}")
     os.system(f"am force-stop {package_name} >/dev/null 2>&1")
     os.system(f"su -c 'am force-stop {package_name}' </dev/null >/dev/null 2>&1")
     os.system(f"su -c 'pkill -9 -f {package_name}' </dev/null >/dev/null 2>&1")
@@ -449,7 +448,6 @@ def launch_roblox(package_name):
         url = f"roblox://placeId={pkg_place_id}"
         log_event(f"Launching {package_name} to Place ID: {pkg_place_id}...")
 
-    print(f"{colors['yellow']}[*]{colors['reset']} {last_logged_event}")
     cmd = f'am start -p {package_name} -a android.intent.action.VIEW -d "{url}"'
     os.system(f"{cmd} >/dev/null 2>&1")
     os.system(f"su -c '{cmd}' </dev/null >/dev/null 2>&1")
@@ -463,22 +461,22 @@ def update_targeted_packages(packages):
     global targeted_packages
     if sorted(targeted_packages) == sorted(packages):
         return
-    print(f"{colors['green']}[+]{colors['reset']} Setting targeted packages to: {packages}")
     targeted_packages = packages
     for pkg in list(log_states.keys()):
         if pkg not in targeted_packages:
             log_states.pop(pkg, None)
+    log_event(f"Targeted packages set ({len(packages)})")
 
 mqtt_client = mqtt.Client()
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print(f"{colors['green']}[+]{colors['reset']} Connected to MQTT broker: {broker_url}")
+        log_event(f"Connected to MQTT: {broker_url}")
         client.subscribe(control_device_topic)
         client.subscribe(control_all_topic)
         send_discovery()
     else:
-        print(f"{colors['red']}[-]{colors['reset']} Connection failed with code {rc}")
+        log_event(f"MQTT connection failed ({rc})")
 
 stop_requested = False
 
@@ -486,7 +484,7 @@ def run_rejoin_sequence(payload):
     global place_id, private_server_link, client_overrides, is_paused, stop_requested
     is_paused = True
     stop_requested = False
-    print(f"{colors['green']}[+]{colors['reset']} Starting sequential rejoin background thread...")
+    log_event("Starting sequential rejoin...")
     
     if "placeId" in payload:
         place_id = payload["placeId"]
@@ -497,7 +495,6 @@ def run_rejoin_sequence(payload):
     
     for pkg in targeted_packages:
         if stop_requested:
-            print(f"{colors['yellow']}[*]{colors['reset']} Rejoin sequence canceled.")
             log_event("Rejoin sequence canceled.")
             return
 
@@ -507,7 +504,6 @@ def run_rejoin_sequence(payload):
         
         for _ in range(2):
             if stop_requested:
-                print(f"{colors['yellow']}[*]{colors['reset']} Rejoin sequence canceled.")
                 log_event("Rejoin sequence canceled.")
                 return
             time.sleep(1)
@@ -515,7 +511,6 @@ def run_rejoin_sequence(payload):
             send_status()
             
         if stop_requested:
-            print(f"{colors['yellow']}[*]{colors['reset']} Rejoin sequence canceled.")
             log_event("Rejoin sequence canceled.")
             return
 
@@ -525,7 +520,6 @@ def run_rejoin_sequence(payload):
         
         for _ in range(10):
             if stop_requested:
-                print(f"{colors['yellow']}[*]{colors['reset']} Rejoin sequence canceled.")
                 log_event("Rejoin sequence canceled.")
                 return
             time.sleep(1)
@@ -540,7 +534,7 @@ def run_rejoin_sequence(payload):
                 json.dump(config, f, indent=2)
         except Exception:
             pass
-        log_event("All targeted packages launched successfully. Monitoring active.")
+        log_event("All targeted packages launched successfully.")
         update_running_states_cache()
         send_status()
 
@@ -570,7 +564,7 @@ def on_message(client, userdata, msg):
                     json.dump(config, f, indent=2)
             except Exception:
                 pass
-            print(f"{colors['green']}[+]{colors['reset']} Received remote command: REJOIN for {targeted_packages}")
+            log_event("Received remote command: REJOIN")
             
             threading.Thread(target=run_rejoin_sequence, args=(payload,), daemon=True).start()
                 
@@ -583,10 +577,10 @@ def on_message(client, userdata, msg):
                     json.dump(config, f, indent=2)
             except Exception:
                 pass
-            print(f"{colors['green']}[+]{colors['reset']} Received remote command: KILL")
+            log_event("Received remote command: KILL")
             for pkg in targeted_packages:
                 force_stop_roblox(pkg)
-            log_event("All targeted packages terminated via PC dashboard command.")
+            log_event("All targeted packages terminated.")
             update_running_states_cache()
             send_status()
 
@@ -599,8 +593,7 @@ def on_message(client, userdata, msg):
                     json.dump(config, f, indent=2)
             except Exception:
                 pass
-            print(f"{colors['yellow']}[*]{colors['reset']} Received remote command: STOP MONITORING")
-            log_event("Auto-rejoin monitoring stopped via PC dashboard command.")
+            log_event("Received remote command: STOP")
             send_status()
     except Exception as e:
         print(f"{colors['red']}[-]{colors['reset']} Error processing message: {e}")
