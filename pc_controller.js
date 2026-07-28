@@ -565,7 +565,7 @@ async function main() {
                 if (dev.state === "ONLINE") {
                     if (dev.isRejoining === true) {
                         devTimerStr = ` ${colors.yellow}(Rejoining...)${colors.reset}`;
-                    } else if (dev.isPaused === false && !isRejoinerPaused) {
+                    } else if (dev.isPaused === false) {
                         const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
                         let latestLaunchTs = dev.lastLaunchTime || 0;
                         
@@ -1224,13 +1224,11 @@ async function main() {
                 return;
             }
             if (key.name === 'k') {
-                isRejoinerPaused = true;
-                config.rejoinerActive = false;
-                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+                configuringDevice.isPaused = true;
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
                     command: "kill"
                 }));
-                lastActionNotice = `${colors.red}[K] KILL sent to ${configuringDevice.displayName} (PAUSED).${colors.reset}`;
+                lastActionNotice = `${colors.red}[K] KILL sent to ${configuringDevice.displayName}.${colors.reset}`;
                 configuringDevice = null;
                 drawUI();
                 return;
