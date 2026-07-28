@@ -436,7 +436,7 @@ def get_installed_roblox_packages():
         packages = []
         for line in output.splitlines():
             pkg_lower = line.lower()
-            if any(k in pkg_lower for k in ["roblox", "clien", "noka", "delta"]):
+            if any(k in pkg_lower for k in ["roblox", "clien", "noka"]):
                 pkg = line.replace("package:", "").strip()
                 packages.append(pkg)
         return sorted(packages)
