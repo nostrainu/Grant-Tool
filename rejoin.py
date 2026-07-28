@@ -204,6 +204,14 @@ def draw_termux_ui():
 
         installed = get_installed_roblox_packages()
         if installed:
+            max_name_len = 10
+            for p in installed:
+                u = user_ids_cache.get(p, "Unknown")
+                d = u if u and u != "Unknown" else p
+                if len(d) > max_name_len:
+                    max_name_len = len(d)
+            name_w = max_name_len + 1
+
             for pkg in installed:
                 is_run = check_roblox_running(pkg)
                 is_target = pkg in targeted_packages
@@ -234,10 +242,10 @@ def draw_termux_ui():
                         else:
                             cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
                             
-                disp_formatted = f"{colors['bold']}{disp_name}{colors['reset']}"
+                disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
                 pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
                 
-                print(f"   {target_str} {disp_formatted}{cycle_tag_fmt} {pkg_formatted} - {status_str}")
+                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
         else:
             print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
@@ -259,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2006
+SCRIPT_VERSION = 2007
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
