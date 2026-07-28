@@ -1597,7 +1597,7 @@ async function main() {
 
         const showCountdown = (config.autoRejoinIntervalMinutes > 0 && lastRejoinTime !== null && !isRejoinerPaused);
         if (changed || showCountdown) {
-            if (!selectingDevice && !configuringDevice && !updatingConfig) {
+            if (!selectingDevice && !configuringDevice && !updatingConfig && !managingRAM) {
                 drawUI();
             }
         }
