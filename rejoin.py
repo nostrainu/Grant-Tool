@@ -267,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2009
+SCRIPT_VERSION = 2010
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -720,6 +720,7 @@ print(f"{colors['yellow']}[*] Monitoring & Standalone PS Cycle loop started. Pre
 
 last_status_send = 0
 last_ui_draw = 0
+last_protect_time = 0
 RESTART_COOLDOWN = 60
 
 try:
@@ -727,9 +728,11 @@ try:
         now = time.time()
         update_running_states_cache()
         
-        for pkg in targeted_packages:
-            if check_roblox_running(pkg):
-                protect_process(pkg)
+        if now - last_protect_time >= 30:
+            for pkg in targeted_packages:
+                if check_roblox_running(pkg):
+                    protect_process(pkg)
+            last_protect_time = now
                 
         for pkg in get_installed_roblox_packages():
             if pkg not in user_ids_cache:
@@ -748,7 +751,6 @@ try:
                     last_launch = last_launch_time.get(pkg, 0)
                     if now - last_launch >= RESTART_COOLDOWN:
                         log_event(f"Auto-restart: {pkg} found stopped, relaunching...")
-                        print(f"{colors['red']}[!]{colors['reset']} {last_logged_event}")
                         force_stop_roblox(pkg)
                         time.sleep(3)
                         launch_roblox(pkg)
@@ -758,11 +760,11 @@ try:
                 if "Killing" in last_logged_event or "Launching" in last_logged_event or "Auto-restart" in last_logged_event:
                     log_event("All targeted packages are running. Monitoring active.")
 
-        if now - last_ui_draw >= 10:
+        if now - last_ui_draw >= 1:
             draw_termux_ui()
             last_ui_draw = now
 
-        time.sleep(0.5)
+        time.sleep(1)
 
 except KeyboardInterrupt:
     print("[*] Exiting script...")
