@@ -230,7 +230,7 @@ def draw_termux_ui():
                     r_m = min_rem // 60
                     r_s = min_rem % 60
                     rem_str = f"{r_m}:{r_s:02d}"
-                auto_text = f"Every {m_label} (Next in: {rem_str})"
+                auto_text = f"{m_label} (Next: {rem_str})"
                 auto_color = colors['green']
             else:
                 auto_text = "Disabled"
