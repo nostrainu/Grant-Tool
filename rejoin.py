@@ -431,17 +431,26 @@ def protect_process(package_name):
         pass
 
 def get_installed_roblox_packages():
-    try:
-        output = subprocess.check_output("pm list packages", shell=True).decode()
-        packages = []
-        for line in output.splitlines():
-            pkg_lower = line.lower()
-            if any(k in pkg_lower for k in ["roblox", "clien", "noka"]):
-                pkg = line.replace("package:", "").strip()
-                packages.append(pkg)
-        return sorted(packages)
-    except Exception:
-        return []
+    packages = set()
+    cmds = [
+        "pm list packages -3",
+        "pm list packages",
+        "su -c 'pm list packages -3' < /dev/null",
+        "su -c 'pm list packages' < /dev/null"
+    ]
+    for cmd in cmds:
+        try:
+            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
+            for line in out.splitlines():
+                line_str = line.strip()
+                if line_str.startswith("package:"):
+                    pkg = line_str.replace("package:", "").strip()
+                    pkg_lower = pkg.lower()
+                    if any(k in pkg_lower for k in ["roblox", "clien", "noka", "free"]):
+                        packages.add(pkg)
+        except Exception:
+            pass
+    return sorted(list(packages))
 
 def get_roblox_username_or_id(package_name):
     app_storage_path = f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json"
