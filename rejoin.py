@@ -129,7 +129,7 @@ recent_logs = deque(maxlen=6)
 
 def draw_termux_ui():
     try:
-        sys.stdout.write("\033[H\033[2J\033[3J")
+        sys.stdout.write("\033[H")
         sys.stdout.flush()
         
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
@@ -267,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2013
+SCRIPT_VERSION = 2014
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
