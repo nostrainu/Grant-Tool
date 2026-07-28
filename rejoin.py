@@ -495,8 +495,14 @@ def inject_roblox_cookie(package_name, cookie_value, username=""):
     if not cookie_value:
         return
     cookie_val = cookie_value.strip()
-    if cookie_val.startswith(".ROBLOSECURITY="):
-        cookie_val = cookie_val.split("=", 1)[1].strip()
+    if ".ROBLOSECURITY=" in cookie_val:
+        cookie_val = cookie_val.split(".ROBLOSECURITY=", 1)[1].strip()
+    if "ROBLOSECURITY=" in cookie_val:
+        cookie_val = cookie_val.split("ROBLOSECURITY=", 1)[1].strip()
+    cookie_val = cookie_val.split(";")[0].strip().strip('"').strip("'")
+
+    if not cookie_val:
+        return
 
     log_event(f"Injecting .ROBLOSECURITY cookie for {package_name}...")
     
@@ -513,10 +519,12 @@ def inject_roblox_cookie(package_name, cookie_value, username=""):
 
     db_dirs = [
         f"/data/data/{package_name}/app_webview/Default",
-        f"/data/data/{package_name}/app_webview"
+        f"/data/data/{package_name}/app_webview",
+        f"/data/data/{package_name}/databases"
     ]
     for d in db_dirs:
-        os.system(f"su -c 'mkdir -p {d}' < /dev/null >/dev/null 2>&1")
+        os.system(f"su -c 'mkdir -p \"{d}\"' < /dev/null >/dev/null 2>&1")
+        os.system(f"su -c 'chmod 777 \"{d}\"' < /dev/null >/dev/null 2>&1")
 
     db_paths = [
         f"/data/data/{package_name}/app_webview/Default/Cookies",
@@ -531,16 +539,20 @@ def inject_roblox_cookie(package_name, cookie_value, username=""):
                 "db_p = '" + db + "'; "
                 "conn = sqlite3.connect(db_p); "
                 "cur = conn.cursor(); "
-                "cur.execute('CREATE TABLE IF NOT EXISTS cookies (creation_utc INTEGER NOT NULL, host_key TEXT NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, path TEXT NOT NULL, expires_utc INTEGER NOT NULL, is_secure INTEGER NOT NULL, is_httponly INTEGER NOT NULL, last_access_utc INTEGER NOT NULL, has_expires INTEGER NOT NULL DEFAULT 1, is_persistent INTEGER NOT NULL DEFAULT 1, priority INTEGER NOT NULL DEFAULT 1, samesite INTEGER NOT NULL DEFAULT -1, source_scheme INTEGER NOT NULL DEFAULT 2, source_port INTEGER NOT NULL DEFAULT -1, is_same_party INTEGER NOT NULL DEFAULT 0)'); "
+                "cur.execute('CREATE TABLE IF NOT EXISTS cookies (creation_utc INTEGER NOT NULL, host_key TEXT NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, path TEXT NOT NULL, expires_utc INTEGER NOT NULL, is_secure INTEGER NOT NULL, is_httponly INTEGER NOT NULL, last_access_utc INTEGER NOT NULL, has_expires INTEGER NOT NULL DEFAULT 1, is_persistent INTEGER NOT NULL DEFAULT 1, priority INTEGER NOT NULL DEFAULT 1, samesite INTEGER NOT NULL DEFAULT -1, source_scheme INTEGER NOT NULL DEFAULT 2, source_port INTEGER NOT NULL DEFAULT 443, is_same_party INTEGER NOT NULL DEFAULT 0)'); "
                 "cur.execute('PRAGMA table_info(cookies)'); "
                 "cols = [r[1] for r in cur.fetchall()]; "
-                "cur.execute(\"DELETE FROM cookies WHERE name='.ROBLOSECURITY' OR host_key LIKE '%roblox.com%'\"); "
-                "row = {'creation_utc': 13300000000000000, 'host_key': '.roblox.com', 'top_frame_site_key': '', 'name': '.ROBLOSECURITY', 'value': '''" + cookie_val + "''', 'path': '/', 'expires_utc': 253402300799000000, 'is_secure': 1, 'is_httponly': 1, 'last_access_utc': 13300000000000000, 'has_expires': 1, 'is_persistent': 1, 'priority': 1, 'samesite': -1, 'source_scheme': 2, 'source_port': -1, 'is_same_party': 0, 'source_type': 0, 'has_cross_site_ancestor': 0}; "
-                "p_cols = [c for c in cols if c in row]; "
-                "sql = f\"INSERT INTO cookies ({', '.join(p_cols)}) VALUES ({', '.join(['?']*len(p_cols))})\"; "
-                "cur.execute(sql, tuple(row[c] for c in p_cols)); "
+                "cur.execute(\"DELETE FROM cookies WHERE name LIKE '%ROBLOSECURITY%' OR host_key LIKE '%roblox.com%'\"); "
+                "hosts = ['.roblox.com', 'roblox.com', 'www.roblox.com', '.www.roblox.com', 'web.roblox.com']; "
+                "names = ['.ROBLOSECURITY', 'ROBLOSECURITY']; "
+                "for h in hosts: "
+                "  for n in names: "
+                "    row = {'creation_utc': 13300000000000000, 'host_key': h, 'top_frame_site_key': '', 'name': n, 'value': '''" + cookie_val + "''', 'path': '/', 'expires_utc': 253402300799000000, 'is_secure': 1, 'is_httponly': 1, 'last_access_utc': 13300000000000000, 'has_expires': 1, 'is_persistent': 1, 'priority': 1, 'samesite': -1, 'source_scheme': 2, 'source_port': 443, 'is_same_party': 0, 'source_type': 0, 'has_cross_site_ancestor': 0}; "
+                "    p_cols = [c for c in cols if c in row]; "
+                "    sql = f\"INSERT INTO cookies ({', '.join(p_cols)}) VALUES ({', '.join(['?']*len(p_cols))})\"; "
+                "    cur.execute(sql, tuple(row[c] for c in p_cols)); "
                 "conn.commit(); conn.close(); "
-                "os.system('chmod 666 ' + db_p); "
+                "os.system('chmod 777 ' + db_p); "
                 "os.system('rm -f ' + db_p + '-wal ' + db_p + '-shm')"
             )
             cmd = f"su -c '{py_bin} -c \"{py_code}\"' < /dev/null >/dev/null 2>&1"
@@ -560,13 +572,15 @@ def inject_roblox_cookie(package_name, cookie_value, username=""):
             
         json_str = json.dumps(storage_data).replace('"', '\\"')
         os.system(f"su -c 'echo \"{json_str}\" > \"{app_storage_file}\"' < /dev/null >/dev/null 2>&1")
-        os.system(f"su -c 'chmod 666 \"{app_storage_file}\"' < /dev/null >/dev/null 2>&1")
+        os.system(f"su -c 'chmod 777 \"{app_storage_file}\"' < /dev/null >/dev/null 2>&1")
     except Exception:
         pass
 
     if owner:
         os.system(f"su -c 'chown -R {owner} /data/data/{package_name}/app_webview' < /dev/null >/dev/null 2>&1")
         os.system(f"su -c 'chown -R {owner} /data/data/{package_name}/files' < /dev/null >/dev/null 2>&1")
+        os.system(f"su -c 'chmod -R 777 /data/data/{package_name}/app_webview' < /dev/null >/dev/null 2>&1")
+        os.system(f"su -c 'chmod -R 777 /data/data/{package_name}/files' < /dev/null >/dev/null 2>&1")
 
 def launch_roblox(package_name):
     global client_overrides
