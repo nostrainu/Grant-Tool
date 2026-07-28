@@ -4,6 +4,8 @@ const mqtt = require('mqtt');
 const readline = require('readline');
 const { execSync } = require('child_process');
 const https = require('https');
+const os = require('os');
+const http = require('http');
 
 function getClipboardText() {
     try {
@@ -485,6 +487,8 @@ async function main() {
         printOuterLine(innerContent);
     }
 
+    let currentDevicePage = 0;
+
     function drawUI() {
         console.clear();
         const now = new Date();
@@ -558,10 +562,18 @@ async function main() {
         }
 
         printInnerLine(`${colors.gray}${"─".repeat(innerWidth - 4)}${colors.reset}`);
-        printInnerLine(`${colors.bold}${colors.cyan}CONNECTED DEVICES:${colors.reset}`);
+        
+        const totalPages = Math.ceil(deviceIds.length / 4) || 1;
+        if (currentDevicePage >= totalPages) currentDevicePage = 0;
 
-        if (deviceIds.length > 0) {
-            deviceIds.forEach((id, index) => {
+        const pageDeviceIds = deviceIds.slice(currentDevicePage * 4, (currentDevicePage + 1) * 4);
+        const pageTag = totalPages > 1 ? ` ${colors.gray}(Page ${currentDevicePage + 1}/${totalPages})${colors.reset}` : "";
+
+        printInnerLine(`${colors.bold}${colors.cyan}CONNECTED DEVICES:${colors.reset}${pageTag}`);
+
+        if (pageDeviceIds.length > 0) {
+            pageDeviceIds.forEach((id, pIndex) => {
+                const globalIndex = currentDevicePage * 4 + pIndex;
                 const dev = devices[id];
 
                 let devTimerStr = "";
@@ -596,7 +608,7 @@ async function main() {
                     }
                 }
 
-                const devHeaderColor = `  [${colors.bold}${colors.cyan}${index + 1}${colors.reset}] Dev: ${colors.cyan}${dev.displayName}${colors.reset} (${dev.state === "ONLINE" ? colors.green : colors.red}${dev.state}${colors.reset})${devTimerStr}`;
+                const devHeaderColor = `  [${colors.bold}${colors.cyan}${globalIndex + 1}${colors.reset}] Dev: ${colors.cyan}${dev.displayName}${colors.reset} (${dev.state === "ONLINE" ? colors.green : colors.red}${dev.state}${colors.reset})${devTimerStr}`;
                 printInnerLine(devHeaderColor);
 
                 const clients = dev.installedClients || [];
@@ -614,44 +626,18 @@ async function main() {
                     }
 
                     const displayName = getDisplayName(pkg, userId);
-                    let psTagText = "";
                     let psTagFormatted = "";
                     const rawClientObj = (config.clientOverrides && config.clientOverrides[id] && config.clientOverrides[id][pkg]) || {};
                     if (Array.isArray(rawClientObj.privateServerList) && rawClientObj.privateServerList.length > 0) {
                         const idx = (rawClientObj.currentPSIndex || 0) + 1;
                         const total = rawClientObj.privateServerList.length;
-
-                        let timerStr = "";
-                        if (isRejoinerPaused) {
-                            timerStr = "PAUSED";
-                        } else {
-                            const clientIntervalSecs = rawClientObj.cycleIntervalSeconds || ((rawClientObj.cycleIntervalMinutes || config.autoRejoinIntervalMinutes || 2) * 60);
-                            const lastTime = rawClientObj.lastCycleTime ? new Date(rawClientObj.lastCycleTime) : (lastRejoinTime || now);
-                            const elapsedSecs = Math.max(0, Math.floor((now.getTime() - lastTime.getTime()) / 1000));
-                            const remainingSecs = Math.max(0, clientIntervalSecs - elapsedSecs);
-
-                            if (remainingSecs < 60) {
-                                timerStr = `${remainingSecs}s`;
-                            } else {
-                                const m = Math.floor(remainingSecs / 60);
-                                const s = remainingSecs % 60;
-                                timerStr = `${m}:${s.toString().padStart(2, '0')}`;
-                            }
-                        }
-
-                        psTagText = ` (PS #${idx}/${total} | ${timerStr})`;
-                        psTagFormatted = ` ${colors.magenta}(PS #${idx}/${total} | ${colors.yellow}${timerStr}${colors.magenta})${colors.reset}`;
+                        psTagFormatted = ` ${colors.magenta}(PS #${idx}/${total})${colors.reset}`;
                     }
 
-                    const labelText = displayName + psTagText;
-                    const targetWidth = 38;
-                    const padLength = Math.max(1, targetWidth - labelText.length);
-                    const paddedLabel = displayName + psTagFormatted + " ".repeat(padLength);
-
-                    const colorLine = `       ${checkMark} ${paddedLabel} - ${statusColor}[${statusText}]${colors.reset}`;
-                    printInnerLine(colorLine);
+                    const lineFormatted = `       ${checkMark} ${displayName.padEnd(24)}${psTagFormatted} - ${statusColor}[${statusText}]${colors.reset}`;
+                    printInnerLine(lineFormatted);
                 });
-                if (index < deviceIds.length - 1) {
+                if (pIndex < pageDeviceIds.length - 1) {
                     printInnerLine("");
                 }
             });
@@ -663,8 +649,8 @@ async function main() {
         console.log(` ${outerBottomBorder}`);
 
         console.log(`\n ${colors.bold}${colors.cyan}LATEST DEVICE LOGS:${colors.reset}`);
-        if (deviceIds.length > 0) {
-            deviceIds.forEach((id) => {
+        if (pageDeviceIds.length > 0) {
+            pageDeviceIds.forEach((id) => {
                 const dev = devices[id];
                 let timeStr = "";
                 if (dev.lastLogTime) {
@@ -684,13 +670,24 @@ async function main() {
             console.log(`  ${colors.gray}No device connected.${colors.reset}`);
         }
 
+        function formatCtrl(keyStr, labelStr, colWidth, keyColor = colors.green) {
+            const plainText = `[${keyStr}] ${labelStr}`;
+            const padLen = Math.max(0, colWidth - plainText.length);
+            return `[${colors.bold}${keyColor}${keyStr}${colors.reset}] ${labelStr}${" ".repeat(padLen)}`;
+        }
+
         console.log(`\n ${colors.bold}${colors.cyan}CONTROLS:${colors.reset}`);
-        console.log(`  [${colors.bold}${colors.green}1${colors.reset}] Start Rejoin        [${colors.bold}${colors.green}4${colors.reset}] Rejoin Interval      [${colors.bold}${colors.green}7${colors.reset}] Stop Rejoiner`);
-        console.log(`  [${colors.bold}${colors.green}2${colors.reset}] Kill Clients        [${colors.bold}${colors.green}5${colors.reset}] Set Private Server   [${colors.bold}${colors.green}8${colors.reset}] Update Devices`);
-        console.log(`  [${colors.bold}${colors.green}3${colors.reset}] Select Clients      [${colors.bold}${colors.green}6${colors.reset}] Set Roblox Place ID  [${colors.bold}${colors.green}9${colors.reset}] RAM`);
-        console.log(`  [${colors.bold}${colors.green}0${colors.reset}] Quit Dashboard`);
+        console.log(`  ${formatCtrl("1", "Start Rejoin", 26)}${formatCtrl("4", "Rejoin Interval", 27)}${formatCtrl("7", "Stop Rejoiner", 25)}`);
+        console.log(`  ${formatCtrl("2", "Kill Clients", 26)}${formatCtrl("5", "Set Private Server", 27)}${formatCtrl("8", "Update Devices", 25)}`);
+        console.log(`  ${formatCtrl("3", "Select Clients", 26)}${formatCtrl("6", "Set Roblox Place ID", 27)}`);
+        if (totalPages > 1) {
+            console.log(`  ${formatCtrl("N", `Next Page (${currentDevicePage + 1}/${totalPages})`, 26, colors.cyan)}${formatCtrl("P", "Prev Page", 27, colors.cyan)}${formatCtrl("0", "Quit Dashboard", 25)}`);
+        } else {
+            console.log(`  ${formatCtrl("0", "Quit Dashboard", 26)}`);
+        }
+
         console.log(`\n ${colors.bold}Last Action:${colors.reset} ${lastActionNotice}`);
-        console.log(` ${colors.bold}${colors.green}Press a control key [0-8]:${colors.reset} `);
+        console.log(` ${colors.bold}${colors.green}Press a control key:${colors.reset} `);
         process.stdout.write('\u001b[J');
     }
 
@@ -700,10 +697,10 @@ async function main() {
         console.log(`\n ${colors.cyan}╔══════ SELECT DEVICE TO CONFIGURE ═════════════════════════════════════════╗${colors.reset}\n`);
         const deviceIds = (config.deviceOrder || []).filter(id => devices[id]);
         deviceIds.forEach((id, index) => {
-            console.log(`  [${colors.bold}${index + 1}${colors.reset}] Device ID: ${colors.cyan}${devices[id].displayName}${colors.reset}`);
+            console.log(`  [${colors.bold}${colors.green}${index + 1}${colors.reset}] Device ID: ${colors.cyan}${devices[id].displayName}${colors.reset}`);
         });
-        console.log(`  [${colors.bold}C${colors.reset}] Cancel and return\n`);
-        console.log(" Press a number key to select a device, or 'C' to cancel...");
+        console.log(`  [${colors.bold}${colors.green}C${colors.reset}] Cancel\n`);
+        console.log(` Press a number key to select a device, or [C] to cancel...`);
     }
 
     function drawClientSelectionMenu() {
@@ -729,14 +726,14 @@ async function main() {
                 customTag = ` ${colors.yellow}(Custom PS: ${shortLink})${colors.reset}`;
             }
 
-            console.log(`  [${colors.bold}${index + 1}${colors.reset}] ${check} ${displayName.padEnd(25)}${customTag}`);
+            console.log(`  [${colors.bold}${colors.green}${index + 1}${colors.reset}] ${check} ${displayName.padEnd(25)}${customTag}`);
         });
-        console.log(`\n  [${colors.bold}P${colors.reset}] Configure Single Custom Private Server Link`);
-        console.log(`  [${colors.bold}L${colors.reset}] Configure PS Cycle List for a Client`);
-        console.log(`  [${colors.bold}R${colors.reset}] Rejoin this device only`);
-        console.log(`  [${colors.bold}K${colors.reset}] Kill this device only`);
-        console.log(`  [${colors.bold}C${colors.reset}] Save targets and return\n`);
-        console.log(" Press number keys (1-4) to toggle targets, 'P' single PS, 'L' PS cycle list, 'R' rejoin, 'K' kill, or 'C' to save & return...");
+        console.log(`\n  [${colors.bold}${colors.green}P${colors.reset}] Configure PS Link Per Client`);
+        console.log(`  [${colors.bold}${colors.cyan}L${colors.reset}] Configure PS Cycle List`);
+        console.log(`  [${colors.bold}${colors.yellow}R${colors.reset}] Rejoin (This Device)`);
+        console.log(`  [${colors.bold}${colors.red}K${colors.reset}] Kill (This Device)`);
+        console.log(`  [${colors.bold}${colors.green}C${colors.reset}] Save\n`);
+        console.log(` Press number keys to toggle targets, [P] PS per client, [L] PS cycle, [R] rejoin, [K] kill, or [C] to save...`);
     }
 
     async function configureCustomPrivateServerLink() {
@@ -1073,7 +1070,7 @@ async function main() {
                         lastLogTime: payload.logTime || null
                     };
                 } else {
-                    if (savedTargets) {
+                    if (savedTargets && (!configuringDevice || configuringDevice.deviceId !== deviceId)) {
                         devices[deviceId].activeClients = [...savedTargets];
                     }
                     devices[deviceId].runningStates = payload.runningStates || {};
@@ -1157,6 +1154,10 @@ async function main() {
     let managingRAM = false;
 
     function getRAMAccounts() {
+        if (Array.isArray(config.cachedRamAccounts) && config.cachedRamAccounts.length > 0) {
+            return { accounts: config.cachedRamAccounts, path: config.ramPath || "RAM WebServer", isEncrypted: false };
+        }
+
         let ramPath = config.ramPath || "";
         const userHome = os.homedir ? os.homedir() : "";
         const possibleDirs = [
@@ -1168,6 +1169,9 @@ async function main() {
             "C:\\ram",
             "C:\\RAM"
         ];
+
+        let foundFile = "";
+        let isEncrypted = false;
 
         for (let d of possibleDirs) {
             if (!d) continue;
@@ -1188,6 +1192,7 @@ async function main() {
             }
 
             if (fs.existsSync(checkFile) && !fs.statSync(checkFile).isDirectory()) {
+                foundFile = checkFile;
                 try {
                     let content = fs.readFileSync(checkFile, 'utf8').replace(/^\uFEFF/, '');
                     let data = JSON.parse(content);
@@ -1201,11 +1206,13 @@ async function main() {
                             }
                         });
                     }
-                    if (accs.length > 0) return { accounts: accs, path: checkFile };
-                } catch (e) { }
+                    if (accs.length > 0) return { accounts: accs, path: checkFile, isEncrypted: false };
+                } catch (e) {
+                    isEncrypted = true;
+                }
             }
         }
-        return { accounts: [], path: "" };
+        return { accounts: [], path: foundFile, isEncrypted: isEncrypted };
     }
 
     function openRAMAccountManager() {
@@ -1221,14 +1228,19 @@ async function main() {
 
         console.log(`\n ${colors.cyan}╔══════ ROBLOX ACCOUNT MANAGER (RAM) ═══════════════════════════════════════╗${colors.reset}\n`);
         if (p) {
-            console.log(`  ${colors.green}[+] RAM Data Found:${colors.reset} ${p}`);
-            console.log(`  ${colors.bold}Total RAM Accounts Detected:${colors.reset} ${accs.length}\n`);
-            accs.forEach((acc, i) => {
-                const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
-                const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
-                const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
-                console.log(`   [${i+1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
-            });
+            if (ramInfo.isEncrypted && accs.length === 0) {
+                console.log(`  ${colors.yellow}[!] AccountData.json is Encrypted by RAM.${colors.reset}`);
+                console.log(`  ${colors.cyan}➜ Please launch "Roblox Account Manager.exe" on your PC.${colors.reset}`);
+                console.log(`  ${colors.gray}   (When RAM is open, press [R] to sync cookies live from RAM Web Server).${colors.reset}\n`);
+            } else {
+                console.log(`  ${colors.bold}Total RAM Accounts Detected:${colors.reset} ${accs.length}\n`);
+                accs.forEach((acc, i) => {
+                    const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
+                    const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
+                    const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
+                    console.log(`   [${i+1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
+                });
+            }
         } else {
             console.log(`  ${colors.red}[-] RAM AccountData file not found.${colors.reset}`);
             console.log(`  ${colors.gray}Press [P] to paste your RAM folder path from clipboard.${colors.reset}`);
@@ -1236,11 +1248,28 @@ async function main() {
 
         console.log(`\n  ${colors.bold}OPTIONS:${colors.reset}`);
         if (accs.length > 0) {
-            console.log(`   [A] ${colors.green}${colors.bold}Auto-Assign RAM Accounts to All Connected Devices${colors.reset}`);
+            console.log(`   [${colors.bold}${colors.green}S${colors.reset}] Select Account to Login (Pick 1 Account -> 1 Client)`);
+            console.log(`   [${colors.bold}${colors.cyan}A${colors.reset}] Auto-Assign All RAM Accounts Across Devices`);
         }
-        console.log(`   [P] Set / Paste RAM Folder Path from Clipboard`);
-        console.log(`   [C] Cancel / Return to Dashboard`);
-        console.log(`\n ${colors.bold}${colors.green}Press [A, P, or C]:${colors.reset} `);
+        if (p && ramInfo.isEncrypted) {
+            console.log(`   [${colors.bold}${colors.cyan}R${colors.reset}] Sync Live Cookies from RAM`);
+        }
+        console.log(`   [${colors.bold}${colors.yellow}P${colors.reset}] Set / Paste RAM Path`);
+        console.log(`   [${colors.bold}${colors.green}C${colors.reset}] Cancel\n`);
+        console.log(` Press a key [S, A, R, P, or C]...`);
+    }
+
+    function getSingleKeyChoice() {
+        return new Promise(resolve => {
+            if (process.stdin.isTTY) process.stdin.setRawMode(true);
+            process.stdin.resume();
+            const onData = (buffer) => {
+                const str = buffer.toString().toLowerCase();
+                process.stdin.removeListener('data', onData);
+                resolve(str);
+            };
+            process.stdin.on('data', onData);
+        });
     }
 
     async function setRAMPathPrompt() {
@@ -1255,40 +1284,46 @@ async function main() {
         console.log(`\n ${colors.cyan}╔══════ CONFIGURE RAM FOLDER PATH ═══════════════════════════════════════╗${colors.reset}\n`);
         console.log(`  ${colors.bold}Current RAM Path:${colors.reset}   ${colors.green}${currentPath}${colors.reset}`);
         console.log(`  ${colors.bold}Clipboard Content:${colors.reset} ${colors.gray}${dispClip}${colors.reset}\n`);
-        console.log(`  [${colors.bold}1${colors.reset}] Paste Path from Clipboard (or press Enter)`);
-        console.log(`  [${colors.bold}2${colors.reset}] Enter Path Manually`);
-        console.log(`  [${colors.bold}C${colors.reset}] Cancel and Return\n`);
+        console.log(`  [${colors.bold}${colors.green}1${colors.reset}] Paste Path from Clipboard (or press Enter)`);
+        console.log(`  [${colors.bold}${colors.cyan}2${colors.reset}] Enter Path Manually`);
+        console.log(`  [${colors.bold}${colors.green}C${colors.reset}] Cancel\n`);
+        console.log(` Press a key [1, 2, or C]...`);
 
-        const ans = await askQuestion(` Select option (1-2, or press Enter to paste): `);
-        const choice = ans.trim().toLowerCase();
+        const key = await getSingleKeyChoice();
 
-        if (choice === '1' || choice === '' || choice === 'p') {
+        if (key === 'c' || key === '\x1b' || key === '\x03') {
+            updatingConfig = false;
+            openRAMAccountManager();
+            return;
+        }
+
+        if (key === '1' || key === '\r' || key === '\n' || key === 'p') {
             if (clipboardRaw) {
                 config.ramPath = clipboardRaw;
+                delete config.cachedRamAccounts;
                 try {
                     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-                    console.log(`\n ${colors.green}[+] RAM Path updated from clipboard!${colors.reset}`);
-                    console.log(`     Path: ${config.ramPath}`);
-                    lastActionNotice = `${colors.green}RAM Path updated from clipboard: ${config.ramPath}${colors.reset}`;
-                } catch (e) {
-                    console.error("[-] Failed to save config:", e.message);
-                }
-            } else {
-                console.log(`\n ${colors.red}[!] Clipboard is empty or invalid.${colors.reset}`);
+                    lastActionNotice = `${colors.green}RAM Path updated from clipboard.${colors.reset}`;
+                } catch (e) { }
             }
-            await new Promise(resolve => setTimeout(resolve, 1200));
-        } else if (choice === '2') {
-            const manualAns = await askQuestion(` Enter RAM Folder Path: `);
-            const cleanPath = manualAns.trim().replace(/^["']|["']$/g, '');
-            if (cleanPath) {
-                config.ramPath = cleanPath;
+            updatingConfig = false;
+            openRAMAccountManager();
+            return;
+        }
+
+        if (key === '2' || key === 'm') {
+            const pathInput = await askQuestion(` Enter RAM Folder Path: `);
+            if (pathInput.trim()) {
+                config.ramPath = pathInput.trim().replace(/^["']|["']$/g, '');
+                delete config.cachedRamAccounts;
                 try {
                     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-                    console.log(`\n ${colors.green}[+] RAM Path saved!${colors.reset}`);
                     lastActionNotice = `${colors.green}RAM Path saved: ${config.ramPath}${colors.reset}`;
                 } catch (e) { }
             }
-            await new Promise(resolve => setTimeout(resolve, 1200));
+            updatingConfig = false;
+            openRAMAccountManager();
+            return;
         }
 
         updatingConfig = false;
@@ -1331,16 +1366,274 @@ async function main() {
         onlineDevs.forEach(dev => {
             const devOverrides = getOverridesForDevice(dev.deviceId);
             client.publish(`${controlDevicePrefix}${dev.deviceId}`, JSON.stringify({
+                command: "update_overrides",
+                clientOverrides: devOverrides
+            }));
+        });
+
+        lastActionNotice = `${colors.green}[RAM] Auto-assigned ${assignedCount} accounts.${colors.reset}`;
+        drawUI();
+    }
+
+    async function promptAccountSelection(accs) {
+        updatingConfig = true;
+        process.stdout.write('\u001b[?1049l\u001b[?25h');
+        console.clear();
+
+        console.log(`\n ${colors.cyan}╔══════ SELECT RAM ACCOUNT TO LOGIN ═══════════════════════════════════════╗${colors.reset}\n`);
+        accs.forEach((acc, i) => {
+            const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
+            const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
+            const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
+            const idxStr = `[${colors.bold}${colors.green}${String(i + 1).padStart(2, ' ')}${colors.reset}]`;
+            console.log(`  ${idxStr} ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
+        });
+        console.log(`  [${colors.bold}${colors.green} C${colors.reset}] Cancel\n`);
+
+        const ans = await askQuestion(` Select RAM Account number (1-${accs.length}): `);
+        const choice = ans.trim().toLowerCase();
+        const num = parseInt(choice, 10);
+
+        if (num && num >= 1 && num <= accs.length) {
+            const selectedAcc = accs[num - 1];
+            await assignSingleRAMAccountPrompt(selectedAcc);
+            return;
+        }
+
+        updatingConfig = false;
+        openRAMAccountManager();
+    }
+
+    async function assignSingleRAMAccountPrompt(acc) {
+        updatingConfig = true;
+        process.stdout.write('\u001b[?1049l\u001b[?25h');
+        console.clear();
+
+        const username = acc.Username || acc.Name || acc.username || "Account";
+        const cookie = acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY || "";
+
+        console.log(`\n ${colors.cyan}╔══════ ASSIGN ACCOUNT: ${colors.bold}${username}${colors.cyan} ══════════════════════════════╗${colors.reset}\n`);
+
+        const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
+        if (onlineDevs.length === 0) {
+            console.log(`  ${colors.red}[!] No online devices connected.${colors.reset}`);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            updatingConfig = false;
+            openRAMAccountManager();
+            return;
+        }
+
+        let targetList = [];
+        onlineDevs.forEach(dev => {
+            const clients = dev.installedClients || [];
+            clients.forEach(pkg => {
+                const pkgClean = pkg.replace('com.roblox.', '').replace('client', 'Client ');
+                const pkgSlot = pkgClean.charAt(0).toUpperCase() + pkgClean.slice(1);
+                
+                let activeUser = (dev.userIds && dev.userIds[pkg]) ? dev.userIds[pkg] : "";
+                if (!activeUser || activeUser === "Unknown") {
+                    activeUser = "Empty";
+                }
+
+                const currentOverride = (config.clientOverrides && config.clientOverrides[dev.deviceId] && config.clientOverrides[dev.deviceId][pkg]) || {};
+                const ramUser = currentOverride.username || "";
+
+                let tagStr = "";
+                if (ramUser && ramUser !== activeUser) {
+                    tagStr = ` ${colors.gray}[RAM Assigned: ${ramUser}]${colors.reset}`;
+                }
+
+                targetList.push({
+                    deviceId: dev.deviceId,
+                    devName: dev.displayName,
+                    pkg: pkg,
+                    slotLabel: pkgSlot,
+                    activeUser: activeUser,
+                    tagStr: tagStr
+                });
+            });
+        });
+
+        targetList.forEach((item, index) => {
+            console.log(`  [${colors.bold}${colors.green}${index + 1}${colors.reset}] ${item.devName} -> ${colors.bold}${colors.cyan}${item.activeUser.padEnd(22)}${colors.reset}${item.tagStr}`);
+        });
+
+        console.log(`  [${colors.bold}${colors.green}C${colors.reset}] Cancel\n`);
+
+        const ans = await askQuestion(` Select target client to log in "${username}": `);
+        const choice = ans.trim().toLowerCase();
+        const num = parseInt(choice, 10);
+
+        if (num && num >= 1 && num <= targetList.length) {
+            const target = targetList[num - 1];
+            if (!config.clientOverrides) config.clientOverrides = {};
+            if (!config.clientOverrides[target.deviceId]) config.clientOverrides[target.deviceId] = {};
+            if (!config.clientOverrides[target.deviceId][target.pkg]) config.clientOverrides[target.deviceId][target.pkg] = {};
+
+            config.clientOverrides[target.deviceId][target.pkg].cookie = cookie;
+            config.clientOverrides[target.deviceId][target.pkg].username = username;
+
+            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+
+            const devOverrides = getOverridesForDevice(target.deviceId);
+            client.publish(`${controlDevicePrefix}${target.deviceId}`, JSON.stringify({
                 command: "rejoin",
+                targetPackages: [target.pkg],
                 placeId: config.placeId,
                 privateServerLink: config.privateServerLink || "",
                 clientOverrides: devOverrides,
                 autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
             }));
-        });
 
-        lastActionNotice = `${colors.green}[RAM] Assigned ${assignedCount} account(s) across connected mobile devices.${colors.reset}`;
-        drawUI();
+            lastActionNotice = `${colors.green}[RAM] Logged in "${username}" to ${target.devName} (${target.slotLabel})!${colors.reset}`;
+            updatingConfig = false;
+            drawUI();
+            return;
+        }
+
+        updatingConfig = false;
+        openRAMAccountManager();
+    }
+
+    function fetchRAMEndpoint(pathStr, port, hostHeader) {
+        return new Promise((resolve, reject) => {
+            const req = http.request({
+                host: '127.0.0.1',
+                port: port || 7963,
+                path: pathStr,
+                headers: { 'Host': hostHeader || `localhost:${port || 7963}` }
+            }, res => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve({ statusCode: res.statusCode, body: data }));
+            });
+            req.on('error', err => reject(err));
+            req.end();
+        });
+    }
+
+    async function syncRAMAccountsLive() {
+        let ramDir = path.dirname(getRAMAccounts().path || "");
+        let password = config.ramPassword || "";
+        let port = "7963";
+
+        if (ramDir) {
+            let iniPath = path.join(ramDir, "RAMSettings.ini");
+            if (fs.existsSync(iniPath)) {
+                try {
+                    let ini = fs.readFileSync(iniPath, 'utf8');
+                    let pMatch = ini.match(/Password\s*=\s*(.+)/i);
+                    let portMatch = ini.match(/WebServerPort\s*=\s*(.+)/i);
+                    if (!password && pMatch && pMatch[1]) password = pMatch[1].trim();
+                    if (portMatch && portMatch[1]) port = portMatch[1].trim();
+                } catch (e) { }
+            }
+        }
+
+        if (!password) password = "123456";
+
+        console.log(`\n  ${colors.cyan}Connecting to RAM Web Server (http://localhost:${port})...${colors.reset}`);
+        let success = false;
+        try {
+            let accRes = await fetchRAMEndpoint(`/GetAccounts?Password=${encodeURIComponent(password)}`, port);
+            if (accRes.statusCode === 200 && accRes.body && !accRes.body.includes("Invalid") && !accRes.body.includes("Empty")) {
+                let userList = accRes.body.split(',').map(u => u.trim()).filter(Boolean);
+                if (userList.length > 0) {
+                    let ramAccounts = [];
+                    for (let username of userList) {
+                        try {
+                            let cookieRes = await fetchRAMEndpoint(`/GetCookie?Account=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}`, port);
+                            if (cookieRes.statusCode === 200 && cookieRes.body && cookieRes.body.includes("_|WARNING")) {
+                                ramAccounts.push({ username: username, cookie: cookieRes.body.trim() });
+                            } else {
+                                ramAccounts.push({ username: username, cookie: "" });
+                            }
+                        } catch (e) {
+                            ramAccounts.push({ username: username, cookie: "" });
+                        }
+                    }
+
+                    if (ramAccounts.length > 0) {
+                        success = true;
+                        config.cachedRamAccounts = ramAccounts;
+                        let assignedCount = 0;
+                        const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
+                        if (!config.clientOverrides) config.clientOverrides = {};
+
+                        onlineDevs.forEach(dev => {
+                            if (!config.clientOverrides[dev.deviceId]) config.clientOverrides[dev.deviceId] = {};
+                            const clients = dev.installedClients || [];
+                            clients.forEach(pkg => {
+                                if (assignedCount < ramAccounts.length) {
+                                    const acc = ramAccounts[assignedCount];
+                                    if (!config.clientOverrides[dev.deviceId][pkg]) config.clientOverrides[dev.deviceId][pkg] = {};
+                                    if (acc.cookie) config.clientOverrides[dev.deviceId][pkg].cookie = acc.cookie;
+                                    if (acc.username) config.clientOverrides[dev.deviceId][pkg].username = acc.username;
+
+                                    assignedCount++;
+                                }
+                            });
+                        });
+
+                        try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+
+                        onlineDevs.forEach(dev => {
+                            const devOverrides = getOverridesForDevice(dev.deviceId);
+                            client.publish(`${controlDevicePrefix}${dev.deviceId}`, JSON.stringify({
+                                command: "update_overrides",
+                                clientOverrides: devOverrides
+                            }));
+                        });
+
+                        lastActionNotice = `${colors.green}[RAM] Synced ${ramAccounts.length} cookies.${colors.reset}`;
+                        managingRAM = false;
+                        drawUI();
+                        return;
+                    }
+                }
+            }
+        } catch (e) { }
+
+        if (!success) {
+            updatingConfig = true;
+            process.stdout.write('\u001b[?1049l\u001b[?25h');
+            console.clear();
+            const clipboardRaw = getClipboardText().replace(/[\r\n]+/g, "").replace(/^["']|["']$/g, '').trim();
+
+            console.log(`\n ${colors.cyan}╔══════ RAM WEBSERVER PASSWORD ═══════════════════════════════════════╗${colors.reset}\n`);
+            console.log(`  ${colors.red}[!] Unable to sync live cookies using password: "${password}"${colors.reset}`);
+            console.log(`  ${colors.gray}Ensure "Roblox Account Manager.exe" is running on your PC.${colors.reset}\n`);
+            console.log(`  Clipboard Content: ${colors.gray}${clipboardRaw || "Empty"}${colors.reset}\n`);
+            console.log(`  [${colors.bold}${colors.green}1${colors.reset}] Enter Custom RAM Password`);
+            console.log(`  [${colors.bold}${colors.cyan}2${colors.reset}] Use Password from Clipboard`);
+            console.log(`  [${colors.bold}${colors.green}C${colors.reset}] Cancel\n`);
+
+            console.log(` Press a key [1, 2, or C]...`);
+
+            const passKey = await getSingleKeyChoice();
+
+            if (passKey === 'c' || passKey === '\x1b' || passKey === '\x03') {
+                updatingConfig = false;
+                openRAMAccountManager();
+                return;
+            }
+
+            if (passKey === '1') {
+                const passInput = await askQuestion(` Enter RAM WebServer Password: `);
+                if (passInput.trim()) {
+                    config.ramPassword = passInput.trim();
+                    try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+                    lastActionNotice = `${colors.green}RAM Password saved.${colors.reset}`;
+                }
+            } else if ((passKey === '2' || passKey === '\r' || passKey === '\n') && clipboardRaw) {
+                config.ramPassword = clipboardRaw;
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+                lastActionNotice = `${colors.green}RAM Password set from clipboard.${colors.reset}`;
+            }
+
+            updatingConfig = false;
+            openRAMAccountManager();
+        }
     }
 
     function keypressHandler(str, key) {
@@ -1352,9 +1645,21 @@ async function main() {
                 drawUI();
                 return;
             }
+            if (key.name === 's') {
+                const ramInfo = getRAMAccounts();
+                if (ramInfo.accounts.length > 0) {
+                    managingRAM = false;
+                    promptAccountSelection(ramInfo.accounts);
+                    return;
+                }
+            }
             if (key.name === 'p') {
                 managingRAM = false;
                 setRAMPathPrompt();
+                return;
+            }
+            if (key.name === 'r') {
+                syncRAMAccountsLive();
                 return;
             }
             if (key.name === 'a') {
@@ -1466,6 +1771,22 @@ async function main() {
             process.stdout.write('\u001b[?1049l\u001b[?25h');
             client.end();
             process.exit();
+        }
+
+        if (key.name === 'n' || key.name === 'right') {
+            const devIds = (config.deviceOrder || []).filter(id => devices[id]);
+            const totalP = Math.ceil(devIds.length / 4) || 1;
+            currentDevicePage = (currentDevicePage + 1) % totalP;
+            drawUI();
+            return;
+        }
+
+        if (key.name === 'p' || key.name === 'left') {
+            const devIds = (config.deviceOrder || []).filter(id => devices[id]);
+            const totalP = Math.ceil(devIds.length / 4) || 1;
+            currentDevicePage = (currentDevicePage - 1 + totalP) % totalP;
+            drawUI();
+            return;
         }
 
         if (key.name === '1') {
