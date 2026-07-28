@@ -464,34 +464,21 @@ def get_installed_roblox_packages():
         return []
 
 def get_roblox_username_or_id(package_name):
-    
     app_storage_path = f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json"
     try:
         cmd = f"su -c 'cat \"{app_storage_path}\" 2>/dev/null' < /dev/null"
         content = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
         if content:
-            
             m = re.search(r'\\?"Username\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
             if not m:
                 m = re.search(r'\\?"Name\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
-            if m:
+            if m and m.group(1).lower() not in ["null", "none", "unknown"]:
                 return m.group(1)
     except Exception:
         pass
 
-    paths = [
-        f"/sdcard/Android/data/{package_name}/files/gloop/external/Internals/Secured/user_id",
-        f"/data/data/{package_name}/files/gloop/external/Internals/Secured/user_id"
-    ]
-    for path in paths:
-        try:
-            cmd = f"su -c 'cat \"{path}\" 2>/dev/null' < /dev/null"
-            output = subprocess.check_output(cmd, shell=True).decode().strip()
-            if output and output.isdigit():
-                return output
-        except Exception:
-            pass
-    return None
+    last_char = package_name[-1].upper() if package_name else "X"
+    return f"Client {last_char}"
 
 
 
