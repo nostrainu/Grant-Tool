@@ -121,53 +121,57 @@ function colorizeGradientWave(text, lineIndex) {
 }
 
 function loadConfig() {
-    try {
-        if (fs.existsSync(configPath)) {
-            config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            if (config.autoRejoinIntervalMinutes === undefined) {
-                config.autoRejoinIntervalMinutes = 0;
+    let loadedSuccess = false;
+    if (fs.existsSync(configPath)) {
+        try {
+            const raw = fs.readFileSync(configPath, 'utf8').trim();
+            if (raw) {
+                config = JSON.parse(raw);
+                loadedSuccess = true;
             }
-            if (config.clientOverrides === undefined) {
-                config.clientOverrides = {};
-            }
-            if (config.deviceTargets === undefined) {
-                config.deviceTargets = {};
-            }
-        } else {
-            config = {
-                connectionCode: "YOUR_UNIQUE_CONNECTION_CODE",
-                placeId: 0,
-                privateServerLink: "",
-                brokerUrl: "mqtt://broker.hivemq.com",
-                autoRejoinIntervalMinutes: 0,
-                clientOverrides: {},
-                deviceTargets: {},
-                rejoinerActive: false
-            };
-            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        } catch (e) {
+            console.log(" [*] Warning: config.json was corrupted or invalid. Resetting to default configuration...");
         }
-        if (config.rejoinerActive === true) {
-            isRejoinerPaused = false;
-            if (config.lastRejoinTime) {
-                const savedDate = new Date(config.lastRejoinTime);
-                if (!isNaN(savedDate.getTime())) {
-                    lastRejoinTime = savedDate;
-                } else {
-                    lastRejoinTime = new Date();
-                    config.lastRejoinTime = lastRejoinTime.toISOString();
-                }
+    }
+    
+    if (!loadedSuccess) {
+        config = {
+            connectionCode: "YOUR_UNIQUE_CONNECTION_CODE",
+            placeId: 0,
+            privateServerLink: "",
+            brokerUrl: "mqtt://broker.hivemq.com",
+            autoRejoinIntervalMinutes: 0,
+            clientOverrides: {},
+            deviceTargets: {},
+            rejoinerActive: false
+        };
+        try {
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        } catch (e) {}
+    }
+    
+    if (config.autoRejoinIntervalMinutes === undefined) config.autoRejoinIntervalMinutes = 0;
+    if (config.clientOverrides === undefined) config.clientOverrides = {};
+    if (config.deviceTargets === undefined) config.deviceTargets = {};
+
+    if (config.rejoinerActive === true) {
+        isRejoinerPaused = false;
+        if (config.lastRejoinTime) {
+            const savedDate = new Date(config.lastRejoinTime);
+            if (!isNaN(savedDate.getTime())) {
+                lastRejoinTime = savedDate;
             } else {
                 lastRejoinTime = new Date();
                 config.lastRejoinTime = lastRejoinTime.toISOString();
             }
         } else {
-            isRejoinerPaused = true;
+            lastRejoinTime = new Date();
+            config.lastRejoinTime = lastRejoinTime.toISOString();
         }
-        updateMobileUpdateFile();
-    } catch (e) {
-        console.error("[-] Failed to load config.json:", e.message);
-        process.exit(1);
+    } else {
+        isRejoinerPaused = true;
     }
+    updateMobileUpdateFile();
 }
 
 function getOverridesForDevice(deviceId) {
