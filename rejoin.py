@@ -491,6 +491,29 @@ def force_stop_roblox(package_name):
     running_states_cache[package_name] = False
     os.system("stty sane")
 
+def inject_roblox_cookie(package_name, cookie_value):
+    if not cookie_value:
+        return
+    cookie_val = cookie_value.strip()
+    if cookie_val.startswith(".ROBLOSECURITY="):
+        cookie_val = cookie_val.split("=", 1)[1].strip()
+
+    log_event(f"Injecting .ROBLOSECURITY cookie for {package_name}...")
+    
+    db_paths = [
+        f"/data/data/{package_name}/app_webview/Default/Cookies",
+        f"/data/data/{package_name}/app_webview/Cookies",
+        f"/data/data/{package_name}/databases/WebView.db"
+    ]
+    
+    for db in db_paths:
+        try:
+            script = f"import sqlite3, os; conn = sqlite3.connect('{db}'); cur = conn.cursor(); cur.execute('CREATE TABLE IF NOT EXISTS cookies (creation_utc INTEGER NOT NULL, host_key TEXT NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, path TEXT NOT NULL, expires_utc INTEGER NOT NULL, is_secure INTEGER NOT NULL, is_httponly INTEGER NOT NULL, last_access_utc INTEGER NOT NULL, has_expires INTEGER NOT NULL DEFAULT 1, is_persistent INTEGER NOT NULL DEFAULT 1, priority INTEGER NOT NULL DEFAULT 1, samesite INTEGER NOT NULL DEFAULT -1, source_scheme INTEGER NOT NULL DEFAULT 1, source_port INTEGER NOT NULL DEFAULT -1, is_same_party INTEGER NOT NULL DEFAULT 0)'); cur.execute(\"DELETE FROM cookies WHERE name='.ROBLOSECURITY' OR host_key LIKE '%roblox.com%'\"); cur.execute(\"INSERT INTO cookies (creation_utc, host_key, name, value, path, expires_utc, is_secure, is_httponly, last_access_utc, has_expires, is_persistent, priority, samesite, source_scheme, source_port, is_same_party) VALUES (13300000000000000, '.roblox.com', '.ROBLOSECURITY', ?, '/', 253402300799000000, 1, 1, 13300000000000000, 1, 1, 1, -1, 1, -1, 0)\", ('{cookie_val}',)); conn.commit(); conn.close(); os.system('chmod 660 {db}')"
+            cmd = f"su -c 'python3 -c \"{script}\"' < /dev/null >/dev/null 2>&1"
+            os.system(cmd)
+        except Exception:
+            pass
+
 def launch_roblox(package_name):
     global client_overrides
     last_launch_time[package_name] = time.time()
@@ -519,14 +542,8 @@ def launch_roblox(package_name):
         url = f"roblox://placeId={pkg_place_id}"
         log_event(f"Launching {package_name} to Place ID: {pkg_place_id}...")
 
-    cmd = f'am start -p {package_name} -a android.intent.action.VIEW -d "{url}"'
-    res = os.system(f"su -c '{cmd}' </dev/null >/dev/null 2>&1")
-    if res != 0:
-        os.system(f"{cmd} >/dev/null 2>&1")
-    os.system("stty sane")
-    for _ in range(3):
-        time.sleep(1)
-        send_status()
+    cmd = f"su -c 'am start -a android.intent.action.VIEW -d \"{url}\" {package_name}' </dev/null >/dev/null 2>&1"
+    os.system(cmd)
     protect_process(package_name)
 
 def update_targeted_packages(packages):
@@ -558,7 +575,6 @@ def run_rejoin_sequence(payload):
     is_paused = True
     is_rejoining = True
     stop_requested = False
-    log_event("Starting sequential rejoin...")
     
     if isinstance(payload, dict):
         if "placeId" in payload:
@@ -567,8 +583,12 @@ def run_rejoin_sequence(payload):
             private_server_link = payload["privateServerLink"]
         client_overrides = payload.get("clientOverrides", client_overrides)
     
-    log_event("Closing all active Roblox clients...")
-    for pkg in targeted_packages:
+    target_pkgs = payload.get("targetPackages") if isinstance(payload, dict) else None
+    pkgs_to_rejoin = [p for p in target_pkgs if p in targeted_packages] if (target_pkgs and isinstance(target_pkgs, list)) else targeted_packages
+
+    log_event(f"Starting rejoin for {len(pkgs_to_rejoin)} client(s)...")
+
+    for pkg in pkgs_to_rejoin:
         if stop_requested:
             is_rejoining = False
             log_event("Rejoin sequence canceled.")
@@ -577,9 +597,9 @@ def run_rejoin_sequence(payload):
     
     update_running_states_cache()
     send_status()
-    time.sleep(3)
+    time.sleep(2)
 
-    for pkg in targeted_packages:
+    for pkg in pkgs_to_rejoin:
         if stop_requested:
             is_rejoining = False
             log_event("Rejoin sequence canceled.")
@@ -602,7 +622,7 @@ def run_rejoin_sequence(payload):
     if not stop_requested:
         is_paused = False
         now_finish = time.time()
-        for pkg in targeted_packages:
+        for pkg in pkgs_to_rejoin:
             last_launch_time[pkg] = now_finish
             if pkg not in client_overrides or not isinstance(client_overrides[pkg], dict):
                 client_overrides[pkg] = {}
@@ -615,7 +635,7 @@ def run_rejoin_sequence(payload):
                 json.dump(config, f, indent=2)
         except Exception:
             pass
-        log_event("All targeted packages launched successfully.")
+        log_event("Rejoin sequence completed successfully.")
         update_running_states_cache()
         send_status()
 
