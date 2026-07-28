@@ -1161,6 +1161,8 @@ async function main() {
         const possiblePaths = [
             ramPath,
             path.join(process.cwd(), "AccountData.json"),
+            "C:\\Users\\mj\\Desktop\\ram\\AccountData.json",
+            "C:\\Users\\mj\\Desktop\\ram",
             "C:\\Users\\mj\\Desktop\\RAM\\AccountData.json",
             "C:\\Users\\mj\\Downloads\\RAM\\AccountData.json",
             "C:\\RAM\\AccountData.json"
@@ -1229,14 +1231,21 @@ async function main() {
 
     function setRAMPathPrompt() {
         updatingConfig = true;
+        if (process.stdin.isTTY) {
+            process.stdin.setRawMode(false);
+        }
+        process.stdout.write('\u001b[2J\u001b[H');
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
         });
 
-        console.log(`\n  ${colors.cyan}Set RAM Folder Path (e.g. C:\\Users\\mj\\Desktop\\RAM):${colors.reset}`);
+        console.log(`\n  ${colors.cyan}Set RAM Folder Path (e.g. C:\\Users\\mj\\Desktop\\ram):${colors.reset}`);
         rl.question("  Folder Path: ", function (answer) {
             rl.close();
+            if (process.stdin.isTTY) {
+                process.stdin.setRawMode(true);
+            }
             updatingConfig = false;
             const cleanPath = answer.trim();
             if (cleanPath) {
