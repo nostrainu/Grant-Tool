@@ -267,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2007
+SCRIPT_VERSION = 2008
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -569,8 +569,16 @@ def run_rejoin_sequence(payload):
         
     if not stop_requested:
         is_paused = False
+        now_finish = time.time()
+        for pkg in targeted_packages:
+            last_launch_time[pkg] = now_finish
+            if pkg not in client_overrides or not isinstance(client_overrides[pkg], dict):
+                client_overrides[pkg] = {}
+            client_overrides[pkg]["lastCycleTime"] = now_finish
+
         try:
             config["isPaused"] = False
+            config["clientOverrides"] = client_overrides
             with open(config_path, "w") as f:
                 json.dump(config, f, indent=2)
         except Exception:
