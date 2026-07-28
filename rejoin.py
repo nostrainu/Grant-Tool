@@ -10,6 +10,9 @@ import threading
 import re
 import urllib.request
 import ssl
+import warnings
+
+warnings.filterwarnings('ignore')
 
 colors = {
     "reset": "\033[0m",
@@ -129,7 +132,7 @@ recent_logs = deque(maxlen=6)
 
 def draw_termux_ui():
     try:
-        sys.stdout.write("\033[H")
+        sys.stdout.write("\033[H\033[2J\033[3J")
         sys.stdout.flush()
         
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
@@ -273,7 +276,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2016
+SCRIPT_VERSION = 2017
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -732,7 +735,7 @@ mqtt_client.loop_start()
 
 os.system("stty sane")
 if is_paused:
-    print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup...{colors['reset']}")
+    log_event("Cleaning up any leftover Roblox processes on startup...")
     for pkg in get_installed_roblox_packages():
         force_stop_roblox(pkg)
     log_event("Startup cleanup completed.")
@@ -741,7 +744,7 @@ else:
 check_self_update()
 
 threading.Thread(target=phone_cycle_worker, daemon=True).start()
-print(f"{colors['yellow']}[*] Monitoring & Standalone PS Cycle loop started. Press Ctrl+C to exit.{colors['reset']}")
+log_event("Monitoring & Standalone PS Cycle loop started.")
 
 last_status_send = 0
 last_ui_draw = 0
