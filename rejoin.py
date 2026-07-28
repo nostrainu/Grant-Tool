@@ -196,11 +196,12 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
-        print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
+        lines = []
+        lines.append(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
+        lines.append(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
+        lines.append(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        lines.append(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        lines.append(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
@@ -245,17 +246,22 @@ def draw_termux_ui():
                 disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
                 pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
                 
-                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
+                lines.append(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
         else:
-            print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
+            lines.append(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
-        print(f"\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
+        lines.append(f"\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
         if recent_logs:
             for item in recent_logs:
                 clean_item = item if len(item) <= 42 else item[:39] + "..."
-                print(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
+                lines.append(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
         else:
-            print(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
+            lines.append(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
+
+        sys.stdout.write("\033[H" + "\n".join(lines) + "\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
     except Exception:
         pass
 
@@ -267,7 +273,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2014
+SCRIPT_VERSION = 2015
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -388,7 +394,12 @@ def protect_process(package_name):
     except Exception:
         pass
 
+installed_pkgs_cache = []
+
 def get_installed_roblox_packages():
+    global installed_pkgs_cache
+    if installed_pkgs_cache:
+        return installed_pkgs_cache
     try:
         output = subprocess.check_output("pm list packages", shell=True).decode()
         packages = []
@@ -396,7 +407,8 @@ def get_installed_roblox_packages():
             if "roblox" in line.lower() or "clien" in line.lower():
                 pkg = line.replace("package:", "").strip()
                 packages.append(pkg)
-        return sorted(packages)
+        installed_pkgs_cache = sorted(packages)
+        return installed_pkgs_cache
     except Exception:
         return []
 
