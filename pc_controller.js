@@ -11,7 +11,7 @@ function getClipboardText() {
         if (text && text.trim()) {
             return text.trim();
         }
-    } catch (e) {}
+    } catch (e) { }
     try {
         const text = execSync('powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetText()"', { encoding: 'utf8', timeout: 2000 });
         return text.trim();
@@ -34,7 +34,7 @@ public class WinCon {
 }
 '@; Add-Type -TypeDefinition $c -ErrorAction SilentlyContinue; [WinCon]::Go()`;
             execSync(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${psCmd.replace(/\r?\n/g, ' ')}"`, { stdio: 'ignore', timeout: 4000 });
-        } catch (e) {}
+        } catch (e) { }
     }
 }
 
@@ -266,7 +266,7 @@ async function main() {
         if (fs.existsSync(usernamesPath)) {
             usernameCache = JSON.parse(fs.readFileSync(usernamesPath, 'utf8'));
         }
-    } catch (e) {}
+    } catch (e) { }
 
     function saveUsernameCache() {
         try {
@@ -277,7 +277,7 @@ async function main() {
                 }
             }
             fs.writeFileSync(usernamesPath, JSON.stringify(toSave, null, 2));
-        } catch (e) {}
+        } catch (e) { }
     }
 
     function getUsername(userId) {
@@ -285,7 +285,7 @@ async function main() {
         if (usernameCache[userId]) {
             return usernameCache[userId];
         }
-        
+
         if (!usernameCache[userId + "_fetching"]) {
             usernameCache[userId + "_fetching"] = true;
             https.get(`https://users.roblox.com/v1/users/${userId}`, (res) => {
@@ -312,7 +312,7 @@ async function main() {
                 delete usernameCache[userId + "_fetching"];
             });
         }
-        
+
         return null;
     }
 
@@ -320,7 +320,7 @@ async function main() {
         const username = getUsername(userId);
         if (username) return username;
         if (userId && userId !== "Unknown") return userId;
-        
+
         const match = pkg.match(/clien([a-z0-9]+)$/i);
         if (match) {
             return `Client ${match[1].toUpperCase()}`;
@@ -344,31 +344,95 @@ async function main() {
     let devices = {};
 
     let selectingDevice = false;
-    let configuringDevice = null; 
+    let configuringDevice = null;
     let updatingConfig = false;
 
-    async function savePrivateServerLinkFromClipboard() {
+    async function configureGlobalPrivateServerLink() {
         updatingConfig = true;
+        process.stdout.write('\u001b[?1049l\u001b[?25h');
         console.clear();
-        console.log(`\n ${colors.cyan}--- SET PRIVATE SERVER LINK FROM CLIPBOARD ---${colors.reset}`);
-        console.log(` ${colors.gray}Reading from clipboard...${colors.reset}`);
-        
-        const clipboardText = getClipboardText().replace(/[\r\n]+/g, "");
-        if (clipboardText) {
-            config.privateServerLink = clipboardText;
+
+        const currentLink = config.privateServerLink || "";
+        const dispLink = currentLink ? (currentLink.length > 50 ? "..." + currentLink.slice(-45) : currentLink) : "None";
+        const clipboardRaw = getClipboardText().replace(/[\r\n]+/g, "").replace(/^["']|["']$/g, '').trim();
+        const dispClip = clipboardRaw ? (clipboardRaw.length > 45 ? "..." + clipboardRaw.slice(-40) : clipboardRaw) : "Empty";
+
+        console.log(`\n ${colors.cyan}╔══════ CONFIGURE GLOBAL PRIVATE SERVER LINK ══════════════════════════════╗${colors.reset}\n`);
+        console.log(`  ${colors.bold}Current Server:${colors.reset}   ${currentLink ? colors.green + dispLink + colors.reset : colors.gray + "None" + colors.reset}`);
+        console.log(`  ${colors.bold}Clipboard Content:${colors.reset} ${colors.gray}${dispClip}${colors.reset}\n`);
+        console.log(`  [${colors.bold}1${colors.reset}] Paste Link from Clipboard`);
+        console.log(`  [${colors.bold}2${colors.reset}] Enter Link Manually`);
+        console.log(`  [${colors.bold}3${colors.reset}] Clear / Remove Private Server Link`);
+        console.log(`  [${colors.bold}C${colors.reset}] Cancel and Return\n`);
+
+        const ans = await askQuestion(` Select option (1-3 or C): `);
+        const choice = ans.trim().toLowerCase();
+
+        if (choice === '1') {
+            if (clipboardRaw) {
+                config.privateServerLink = clipboardRaw;
+                try {
+                    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                    updateMobileUpdateFile();
+                    console.log(`\n ${colors.green}[+] Private Server Link updated from clipboard!${colors.reset}`);
+                    console.log(`     Link: ${config.privateServerLink.length > 50 ? "..." + config.privateServerLink.slice(-45) : config.privateServerLink}`);
+                    lastActionNotice = `${colors.green}[5] Private Server Link updated from clipboard.${colors.reset}`;
+                } catch (e) {
+                    console.error("[-] Failed to save config:", e.message);
+                }
+            } else {
+                console.log(`\n ${colors.red}[!] Clipboard is empty or contains invalid text.${colors.reset}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        } else if (choice === '2') {
+            const manualInput = await askQuestion(`\n Enter Private Server Link (or type 'clear' to remove): `);
+            const trimmed = manualInput.trim().replace(/^["']|["']$/g, '').trim();
+            if (trimmed.toLowerCase() === 'clear' || trimmed.toLowerCase() === 'reset' || trimmed.toLowerCase() === 'none') {
+                config.privateServerLink = "";
+                try {
+                    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                    updateMobileUpdateFile();
+                    console.log(`\n ${colors.yellow}[+] Private Server Link cleared!${colors.reset}`);
+                    lastActionNotice = `${colors.yellow}[5] Private Server Link cleared.${colors.reset}`;
+                } catch (e) {
+                    console.error("[-] Failed to save config:", e.message);
+                }
+            } else if (trimmed) {
+                config.privateServerLink = trimmed;
+                try {
+                    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                    updateMobileUpdateFile();
+                    console.log(`\n ${colors.green}[+] Private Server Link set manually!${colors.reset}`);
+                    console.log(`     Link: ${config.privateServerLink.length > 50 ? "..." + config.privateServerLink.slice(-45) : config.privateServerLink}`);
+                    lastActionNotice = `${colors.green}[5] Private Server Link updated manually.${colors.reset}`;
+                } catch (e) {
+                    console.error("[-] Failed to save config:", e.message);
+                }
+            } else {
+                console.log(`\n ${colors.yellow}[*] No input entered. Link unchanged.${colors.reset}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        } else if (choice === '3' || choice === 'clear' || choice === 'reset' || choice === 'none') {
+            config.privateServerLink = "";
             try {
                 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                 updateMobileUpdateFile();
-                console.log(`\n ${colors.green}[+] Private Server Link updated successfully!${colors.reset}`);
-                console.log(`     Link: ${config.privateServerLink.length > 45 ? "..." + config.privateServerLink.slice(-40) : config.privateServerLink}`);
+                console.log(`\n ${colors.yellow}[+] Private Server Link cleared successfully!${colors.reset}`);
+                lastActionNotice = `${colors.yellow}[5] Private Server Link cleared.${colors.reset}`;
             } catch (e) {
                 console.error("[-] Failed to save config:", e.message);
             }
+            await new Promise(resolve => setTimeout(resolve, 1500));
         } else {
-            console.log(`\n ${colors.red}[!] Clipboard is empty or contains invalid text.${colors.reset}`);
+            console.log(`\n ${colors.gray}[*] Cancelled.${colors.reset}`);
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        if (process.stdin.isTTY) {
+            process.stdin.setRawMode(true);
+            process.stdin.resume();
+        }
+        process.stdout.write('\u001b[?1049h\u001b[?25l');
         updatingConfig = false;
         drawUI();
     }
@@ -378,10 +442,10 @@ async function main() {
         console.clear();
         console.log(`\n ${colors.cyan}--- SET ROBLOX PLACE ID FROM CLIPBOARD ---${colors.reset}`);
         console.log(` ${colors.gray}Reading from clipboard...${colors.reset}`);
-        
+
         const clipboardText = getClipboardText().replace(/[\r\n]+/g, "").replace(/\D/g, "");
         const parsed = parseInt(clipboardText, 10);
-        
+
         if (parsed && parsed > 0) {
             config.placeId = parsed;
             try {
@@ -395,7 +459,7 @@ async function main() {
         } else {
             console.log(`\n ${colors.red}[!] Clipboard does not contain a valid number Place ID.${colors.reset}`);
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, 2000));
         updatingConfig = false;
         drawUI();
@@ -426,13 +490,13 @@ async function main() {
         const outerBottomBorder = `${colors.yellow}└${"─".repeat(outerWidth)}┘${colors.reset}`;
 
         console.log(` ${outerTopBorder}`);
-        
+
         const dashTitle = " Dashboard ";
         const innerTopBorder = `${colors.cyan}╔${"═".repeat(6)}${colors.reset}${colors.bold}${colors.cyan}${dashTitle}${colors.reset}${colors.cyan}${"═".repeat(innerWidth - 2 - 6 - dashTitle.length)}╗${colors.reset}`;
         const innerBottomBorder = `${colors.cyan}╚${"═".repeat(innerWidth - 2)}╝${colors.reset}`;
 
         printOuterLine(` ${innerTopBorder} `);
-        
+
         if (!config.deviceOrder) config.deviceOrder = [];
         const knownIds = Object.keys(devices);
         let orderChanged = false;
@@ -443,14 +507,14 @@ async function main() {
             }
         });
         if (orderChanged) {
-            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
         }
         const deviceIds = config.deviceOrder.filter(id => devices[id]);
         deviceIds.forEach((id, index) => {
             devices[id].displayName = `RedFinger ${index + 1}`;
         });
         const onlineCount = deviceIds.filter(id => devices[id].state === "ONLINE").length;
-        
+
         const devColor = `${colors.bold}${"Devices Connected:".padEnd(20)}${colors.reset}${colors.green}${onlineCount} online / ${deviceIds.length} total${colors.reset}`;
         printInnerLine(devColor);
 
@@ -498,7 +562,7 @@ async function main() {
         if (deviceIds.length > 0) {
             deviceIds.forEach((id, index) => {
                 const dev = devices[id];
-                
+
                 const devHeaderColor = `  [${colors.bold}${colors.cyan}${index + 1}${colors.reset}] Dev: ${colors.cyan}${dev.displayName}${colors.reset} (${dev.state === "ONLINE" ? colors.green : colors.red}${dev.state}${colors.reset})`;
                 printInnerLine(devHeaderColor);
 
@@ -507,7 +571,7 @@ async function main() {
                     const isTargeted = dev.activeClients && dev.activeClients.includes(pkg);
                     const runningState = dev.runningStates && dev.runningStates[pkg];
                     const userId = dev.userIds && dev.userIds[pkg] ? dev.userIds[pkg] : "Unknown";
-                    
+
                     const checkMark = isTargeted ? `[${colors.green}X${colors.reset}]` : "[ ]";
                     let statusColor = colors.red;
                     let statusText = "STOPPED";
@@ -515,7 +579,7 @@ async function main() {
                         statusColor = colors.green;
                         statusText = "RUNNING";
                     }
-                    
+
                     const displayName = getDisplayName(pkg, userId);
                     let psTagText = "";
                     let psTagFormatted = "";
@@ -523,7 +587,7 @@ async function main() {
                     if (Array.isArray(rawClientObj.privateServerList) && rawClientObj.privateServerList.length > 0) {
                         const idx = (rawClientObj.currentPSIndex || 0) + 1;
                         const total = rawClientObj.privateServerList.length;
-                        
+
                         let timerStr = "";
                         if (isRejoinerPaused) {
                             timerStr = "PAUSED";
@@ -532,7 +596,7 @@ async function main() {
                             const lastTime = rawClientObj.lastCycleTime ? new Date(rawClientObj.lastCycleTime) : (lastRejoinTime || now);
                             const elapsedSecs = Math.max(0, Math.floor((now.getTime() - lastTime.getTime()) / 1000));
                             const remainingSecs = Math.max(0, clientIntervalSecs - elapsedSecs);
-                            
+
                             if (remainingSecs < 60) {
                                 timerStr = `${remainingSecs}s`;
                             } else {
@@ -541,7 +605,7 @@ async function main() {
                                 timerStr = `${m}:${s.toString().padStart(2, '0')}`;
                             }
                         }
-                        
+
                         psTagText = ` (PS #${idx}/${total} | ${timerStr})`;
                         psTagFormatted = ` ${colors.magenta}(PS #${idx}/${total} | ${colors.yellow}${timerStr}${colors.magenta})${colors.reset}`;
                     }
@@ -564,7 +628,7 @@ async function main() {
 
         printOuterLine(` ${innerBottomBorder} `);
         console.log(` ${outerBottomBorder}`);
-        
+
         console.log(`\n ${colors.bold}${colors.cyan}LATEST DEVICE LOGS:${colors.reset}`);
         if (deviceIds.length > 0) {
             deviceIds.forEach((id) => {
@@ -598,7 +662,7 @@ async function main() {
 
     function drawDeviceSelectionMenu() {
         process.stdout.write('\u001b[2J\u001b[H');
-        
+
         console.log(`\n ${colors.cyan}╔══════ SELECT DEVICE TO CONFIGURE ═════════════════════════════════════════╗${colors.reset}\n`);
         const deviceIds = (config.deviceOrder || []).filter(id => devices[id]);
         deviceIds.forEach((id, index) => {
@@ -610,7 +674,7 @@ async function main() {
 
     function drawClientSelectionMenu() {
         process.stdout.write('\u001b[2J\u001b[H');
-        
+
         console.log(`\n ${colors.cyan}╔══════ SELECT CLIENT TARGETS & PRIVATE SERVERS ════════════════════════════╗${colors.reset}\n`);
         const devOverrides = getOverridesForDevice(configuringDevice.deviceId);
         configuringDevice.installedClients.forEach((pkg, index) => {
@@ -618,7 +682,7 @@ async function main() {
             const check = isTargeted ? `[${colors.green}X${colors.reset}]` : "[ ]";
             const userId = configuringDevice.userIds && configuringDevice.userIds[pkg] ? configuringDevice.userIds[pkg] : "Unknown";
             const displayName = getDisplayName(pkg, userId);
-            
+
             let customTag = "";
             const rawOverride = (config.clientOverrides && config.clientOverrides[configuringDevice.deviceId] && config.clientOverrides[configuringDevice.deviceId][pkg]) || {};
             if (Array.isArray(rawOverride.privateServerList) && rawOverride.privateServerList.length > 0) {
@@ -655,27 +719,27 @@ async function main() {
             const currentTag = currentOverride ? ` (Custom: ...${currentOverride.slice(-20)})` : " (Global Server)";
             console.log(`  [${colors.bold}${index + 1}${colors.reset}] ${displayName.padEnd(25)} ${colors.gray}${currentTag}${colors.reset}`);
         });
-        
+
         const ans = await askQuestion(`\n Enter client number to configure (1-${configuringDevice.installedClients.length}), or 'C' to cancel: `);
         const num = parseInt(ans, 10);
         if (num && num >= 1 && num <= configuringDevice.installedClients.length) {
             const targetPkg = configuringDevice.installedClients[num - 1];
             const userId = configuringDevice.userIds && configuringDevice.userIds[targetPkg] ? configuringDevice.userIds[targetPkg] : "Unknown";
             const targetName = getDisplayName(targetPkg, userId);
-            
+
             console.log(`\n ${colors.yellow}Configuring Private Server for: ${colors.bold}${targetName}${colors.reset} (${configuringDevice.displayName})`);
             console.log(` ${colors.gray}- Press Enter without typing to paste link from clipboard${colors.reset}`);
             console.log(` ${colors.gray}- Type 'reset' to remove custom link and use global server${colors.reset}`);
-            
+
             const inputLink = await askQuestion(`\n Enter Private Server Link: `);
             let finalLink = inputLink.trim().replace(/^["']|["']$/g, '').trim();
             if (finalLink === "") {
                 finalLink = getClipboardText().replace(/[\r\n]+/g, "").replace(/^["']|["']$/g, '').trim();
             }
-            
+
             if (!config.clientOverrides) config.clientOverrides = {};
             if (!config.clientOverrides[configuringDevice.deviceId]) config.clientOverrides[configuringDevice.deviceId] = {};
-            
+
             if (finalLink.toLowerCase() === 'reset' || finalLink.toLowerCase() === 'none') {
                 delete config.clientOverrides[configuringDevice.deviceId][targetPkg];
                 console.log(`\n ${colors.green}[+] Reset ${targetName} to default global Private Server!${colors.reset}`);
@@ -687,14 +751,14 @@ async function main() {
                 console.log(`\n ${colors.red}[!] Invalid link format. (Must start with http:// or https://).${colors.reset}`);
                 console.log(`     Received: "${finalLink}"`);
             }
-            
+
             try {
                 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                 updateMobileUpdateFile();
-            } catch (e) {}
+            } catch (e) { }
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
-        
+
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(true);
             process.stdin.resume();
@@ -710,7 +774,7 @@ async function main() {
         process.stdout.write('\u001b[?1049l\u001b[?25h');
         console.clear();
         console.log(`\n ${colors.cyan}╔══════ CONFIGURE PS CYCLE LIST FOR CLIENT ══════════════════════════════╗${colors.reset}\n`);
-        
+
         configuringDevice.installedClients.forEach((pkg, index) => {
             const userId = configuringDevice.userIds && configuringDevice.userIds[pkg] ? configuringDevice.userIds[pkg] : "Unknown";
             const displayName = getDisplayName(pkg, userId);
@@ -719,18 +783,18 @@ async function main() {
             const currentTag = listCount > 0 ? ` (${listCount} PS links in cycle)` : " (No cycle list)";
             console.log(`  [${colors.bold}${index + 1}${colors.reset}] ${displayName.padEnd(25)} ${colors.magenta}${currentTag}${colors.reset}`);
         });
-        
+
         const ans = await askQuestion(`\n Enter client number to manage PS Cycle List (1-${configuringDevice.installedClients.length}), or 'C' to cancel: `);
         const num = parseInt(ans, 10);
         if (num && num >= 1 && num <= configuringDevice.installedClients.length) {
             const targetPkg = configuringDevice.installedClients[num - 1];
             const userId = configuringDevice.userIds && configuringDevice.userIds[targetPkg] ? configuringDevice.userIds[targetPkg] : "Unknown";
             const targetName = getDisplayName(targetPkg, userId);
-            
+
             if (!config.clientOverrides) config.clientOverrides = {};
             if (!config.clientOverrides[configuringDevice.deviceId]) config.clientOverrides[configuringDevice.deviceId] = {};
             if (!config.clientOverrides[configuringDevice.deviceId][targetPkg]) config.clientOverrides[configuringDevice.deviceId][targetPkg] = {};
-            
+
             const targetOverride = config.clientOverrides[configuringDevice.deviceId][targetPkg];
             if (!Array.isArray(targetOverride.privateServerList)) {
                 targetOverride.privateServerList = [];
@@ -788,7 +852,7 @@ async function main() {
                         try {
                             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                             updateMobileUpdateFile();
-                        } catch (e) {}
+                        } catch (e) { }
                         console.log(`\n ${colors.green}[+] Added PS Link #${targetOverride.privateServerList.length}!${colors.reset}`);
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     } else {
@@ -807,7 +871,7 @@ async function main() {
                         try {
                             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                             updateMobileUpdateFile();
-                        } catch (e) {}
+                        } catch (e) { }
                         console.log(`\n ${colors.yellow}[-] Removed link #${rNum}.${colors.reset}`);
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
@@ -819,7 +883,7 @@ async function main() {
                     try {
                         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                         updateMobileUpdateFile();
-                    } catch (e) {}
+                    } catch (e) { }
                     console.log(`\n ${colors.yellow}[-] Cleared cycle list for ${targetName}.${colors.reset}`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } else if (opt.trim() === '4') {
@@ -828,14 +892,14 @@ async function main() {
                     console.log(`  - Type ${colors.yellow}1m 30s${colors.reset} or ${colors.yellow}1m30s${colors.reset} for 1 minute & 30 seconds`);
                     console.log(`  - Type ${colors.yellow}90s${colors.reset} for 90 seconds`);
                     console.log(`  - Type ${colors.yellow}2m${colors.reset} or ${colors.yellow}2${colors.reset} for 2 minutes`);
-                    
+
                     const iAns = await askQuestion(`\n Enter rotation interval for ${targetName}: `);
                     const trimmed = iAns.trim().toLowerCase();
-                    
+
                     let totalSecs = 0;
                     const mMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?/);
                     const sMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?/);
-                    
+
                     if (mMatch || sMatch) {
                         if (mMatch) totalSecs += parseFloat(mMatch[1]) * 60;
                         if (sMatch) totalSecs += parseFloat(sMatch[1]);
@@ -850,8 +914,8 @@ async function main() {
                         try {
                             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                             updateMobileUpdateFile();
-                        } catch (e) {}
-                        
+                        } catch (e) { }
+
                         let dispStr = "";
                         if (targetOverride.cycleIntervalSeconds < 60) {
                             dispStr = `${targetOverride.cycleIntervalSeconds} second(s)`;
@@ -860,7 +924,7 @@ async function main() {
                             const s = targetOverride.cycleIntervalSeconds % 60;
                             dispStr = s > 0 ? `${m}m ${s}s` : `${m} minute(s)`;
                         }
-                        
+
                         console.log(`\n ${colors.green}[+] Set cycle interval to ${dispStr} for ${targetName}!${colors.reset}`);
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
@@ -868,7 +932,7 @@ async function main() {
                     try {
                         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                         updateMobileUpdateFile();
-                    } catch (e) {}
+                    } catch (e) { }
                     console.log(`\n ${colors.green}[+] Saved cycle configurations for ${targetName}!${colors.reset}`);
                     await new Promise(resolve => setTimeout(resolve, 800));
                     break;
@@ -885,10 +949,10 @@ async function main() {
         drawClientSelectionMenu();
     }
 
-    process.stdout.write('\u001b[?1049h\u001b[?25l'); 
-    
-    drawUI(); 
-    
+    process.stdout.write('\u001b[?1049h\u001b[?25l');
+
+    drawUI();
+
     const client = mqtt.connect(brokerUrl, {
         keepalive: 30,
         reconnectPeriod: 3000,
@@ -956,7 +1020,7 @@ async function main() {
                     devices[deviceId].state = "ONLINE";
                 }
             }
-            
+
             else if (topic.startsWith(`roblox/status/${connectionCode}/`)) {
                 const savedTargets = config.deviceTargets && config.deviceTargets[deviceId];
                 if (!devices[deviceId]) {
@@ -990,7 +1054,7 @@ async function main() {
                         if (!lastRejoinTime || mobileLaunchDate > lastRejoinTime) {
                             lastRejoinTime = mobileLaunchDate;
                             config.lastRejoinTime = lastRejoinTime.toISOString();
-                            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+                            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
                         }
                     }
 
@@ -998,7 +1062,7 @@ async function main() {
                         const pcList = devices[deviceId].activeClients || [];
                         const phoneList = payload.activeClients;
                         const match = pcList.length === phoneList.length && pcList.every(val => phoneList.includes(val));
-                        
+
 
 
                         if (!match) {
@@ -1029,7 +1093,7 @@ async function main() {
 
     function keypressHandler(str, key) {
         if (updatingConfig) return;
-        
+
         if (selectingDevice) {
             if (key.ctrl && key.name === 'c' || key.name === 'q') {
                 client.end();
@@ -1062,7 +1126,7 @@ async function main() {
                 try {
                     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                     updateMobileUpdateFile();
-                } catch (e) {}
+                } catch (e) { }
 
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
                     command: "update_packages",
@@ -1093,14 +1157,15 @@ async function main() {
                         if (devObj[pKey]) devObj[pKey].lastCycleTime = rNow.toISOString();
                     });
                 }
-                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
 
                 const devOverrides = getOverridesForDevice(configuringDevice.deviceId);
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
                     command: "rejoin",
                     placeId: config.placeId,
                     privateServerLink: config.privateServerLink || "",
-                    clientOverrides: devOverrides
+                    clientOverrides: devOverrides,
+                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
                 }));
                 lastActionNotice = `${colors.green}[R] REJOIN command sent to ${configuringDevice.displayName}.${colors.reset}`;
                 configuringDevice = null;
@@ -1110,7 +1175,7 @@ async function main() {
             if (key.name === 'k') {
                 isRejoinerPaused = true;
                 config.rejoinerActive = false;
-                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
                 client.publish(`${controlDevicePrefix}${configuringDevice.deviceId}`, JSON.stringify({
                     command: "kill"
                 }));
@@ -1137,11 +1202,11 @@ async function main() {
         }
 
         if (key.ctrl && key.name === 'c' || key.name === '0') {
-            process.stdout.write('\u001b[?1049l\u001b[?25h'); 
+            process.stdout.write('\u001b[?1049l\u001b[?25h');
             client.end();
             process.exit();
         }
-        
+
         if (key.name === '1') {
             isRejoinerPaused = false;
             lastRejoinTime = new Date();
@@ -1157,7 +1222,7 @@ async function main() {
                     }
                 });
             }
-            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
             const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
             onlineDevs.forEach(dev => {
                 const devOverrides = getOverridesForDevice(dev.deviceId);
@@ -1165,7 +1230,8 @@ async function main() {
                     command: "rejoin",
                     placeId: config.placeId,
                     privateServerLink: config.privateServerLink || "",
-                    clientOverrides: devOverrides
+                    clientOverrides: devOverrides,
+                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
                 }));
             });
             lastActionNotice = `${colors.green}[1] REJOIN command sent to ${onlineDevs.length} online device(s).${colors.reset}`;
@@ -1173,7 +1239,7 @@ async function main() {
         } else if (key.name === '2') {
             isRejoinerPaused = true;
             config.rejoinerActive = false;
-            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
             const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
             onlineDevs.forEach(dev => {
                 client.publish(`${controlDevicePrefix}${dev.deviceId}`, JSON.stringify({
@@ -1185,7 +1251,7 @@ async function main() {
         } else if (key.name === '3') {
             const ids = (config.deviceOrder || []).filter(id => devices[id]);
             if (ids.length === 1) {
-                
+
                 configuringDevice = devices[ids[0]];
                 drawClientSelectionMenu();
             } else if (ids.length > 1) {
@@ -1195,7 +1261,7 @@ async function main() {
                 drawUI();
             }
         } else if (key.name === '4') {
-            
+
             const intervals = [0, 1, 5, 10, 15, 30, 60];
             const currentIdx = intervals.indexOf(config.autoRejoinIntervalMinutes || 0);
             const nextIdx = (currentIdx + 1) % intervals.length;
@@ -1205,12 +1271,11 @@ async function main() {
             try {
                 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                 updateMobileUpdateFile();
-            } catch (e) {}
+            } catch (e) { }
             lastActionNotice = `${colors.yellow}[4] Auto-Rejoin interval set to ${config.autoRejoinIntervalMinutes > 0 ? config.autoRejoinIntervalMinutes + ' mins' : 'Disabled'}.${colors.reset}`;
             drawUI();
         } else if (key.name === '5') {
-            lastActionNotice = `${colors.green}[5] Set Private Server Link triggered.${colors.reset}`;
-            savePrivateServerLinkFromClipboard();
+            configureGlobalPrivateServerLink();
         } else if (key.name === '6') {
             lastActionNotice = `${colors.green}[6] Set Roblox Place ID triggered.${colors.reset}`;
             savePlaceIdFromClipboard();
@@ -1219,7 +1284,7 @@ async function main() {
             lastRejoinTime = null;
             config.rejoinerActive = false;
             config.lastRejoinTime = null;
-            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
             Object.values(devices).forEach(dev => {
                 if (dev.state === "ONLINE") {
                     client.publish(`${controlDevicePrefix}${dev.deviceId}`, JSON.stringify({
@@ -1249,7 +1314,7 @@ async function main() {
     setInterval(() => {
         const now = new Date();
         let changed = false;
-        
+
         const deviceIds = Object.keys(devices);
 
         deviceIds.forEach((id) => {
@@ -1295,7 +1360,7 @@ async function main() {
                 }
             });
             if (cycleChanged) {
-                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
             }
         }
 
@@ -1307,7 +1372,7 @@ async function main() {
                 if (onlineDevs.length > 0) {
                     lastRejoinTime = now;
                     config.lastRejoinTime = lastRejoinTime.toISOString();
-                    try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
+                    try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
                     changed = true;
                     onlineDevs.forEach(dev => {
                         const devOverrides = getOverridesForDevice(dev.deviceId);

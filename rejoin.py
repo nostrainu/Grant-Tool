@@ -232,43 +232,63 @@ user_ids_cache = {}
 def phone_cycle_worker():
     while True:
         time.sleep(1)
-        if is_paused or not client_overrides:
+        if is_paused:
             continue
             
         now_ts = time.time()
         for pkg in list(targeted_packages):
-            override = client_overrides.get(pkg, {})
-            if isinstance(override, dict) and override.get("privateServerList"):
-                ps_list = override.get("privateServerList", [])
-                if len(ps_list) > 1:
-                    interval_sec = override.get("cycleIntervalSeconds")
-                    if not interval_sec and override.get("cycleIntervalMinutes"):
-                        interval_sec = int(override.get("cycleIntervalMinutes") * 60)
-                    if not interval_sec:
-                        interval_sec = 120
-                        
-                    last_cycle = override.get("lastCycleTime", 0)
-                    if last_cycle == 0:
-                        override["lastCycleTime"] = now_ts
-                    elif (now_ts - last_cycle) >= interval_sec:
-                        cur_idx = override.get("currentPSIndex", 0)
+            override = client_overrides.get(pkg, {}) if isinstance(client_overrides, dict) else {}
+            ps_list = override.get("privateServerList", []) if isinstance(override, dict) else []
+            
+            interval_sec = None
+            if isinstance(override, dict):
+                interval_sec = override.get("cycleIntervalSeconds")
+                if not interval_sec and override.get("cycleIntervalMinutes"):
+                    interval_sec = int(override.get("cycleIntervalMinutes") * 60)
+            
+            if not interval_sec:
+                auto_min = config.get("autoRejoinIntervalMinutes", 0)
+                if auto_min and auto_min > 0:
+                    interval_sec = int(auto_min * 60)
+            
+            if interval_sec and interval_sec > 0:
+                last_cycle = override.get("lastCycleTime", 0) if isinstance(override, dict) else 0
+                if last_cycle == 0:
+                    if not isinstance(override, dict):
+                        override = {}
+                    override["lastCycleTime"] = now_ts
+                    client_overrides[pkg] = override
+                elif (now_ts - last_cycle) >= interval_sec:
+                    cur_idx = override.get("currentPSIndex", 0) if isinstance(override, dict) else 0
+                    if ps_list and len(ps_list) > 0:
                         next_idx = (cur_idx + 1) % len(ps_list)
-                        override["currentPSIndex"] = next_idx
-                        override["lastCycleTime"] = now_ts
+                    else:
+                        next_idx = cur_idx
+                    
+                    if not isinstance(override, dict):
+                        override = {}
+                    override["currentPSIndex"] = next_idx
+                    override["lastCycleTime"] = now_ts
+                    client_overrides[pkg] = override
+                    config["clientOverrides"] = client_overrides
+                    
+                    try:
+                        with open(config_path, "w") as f:
+                            json.dump(config, f, indent=2)
+                    except Exception:
+                        pass
                         
-                        try:
-                            config["clientOverrides"] = client_overrides
-                            with open(config_path, "w") as f:
-                                json.dump(config, f, indent=2)
-                        except Exception:
-                            pass
-                            
-                        pkg_name = user_ids_cache.get(pkg) or pkg.split('.')[-1]
+                    pkg_name = user_ids_cache.get(pkg) or pkg.split('.')[-1]
+                    if ps_list and len(ps_list) > 1:
                         log_event(f"Standalone Cycle: Rotating {pkg_name} to PS #{next_idx + 1}/{len(ps_list)}")
-                        force_stop_roblox(pkg)
-                        time.sleep(2)
-                        launch_roblox(pkg)
-                        send_status()
+                    else:
+                        mins_label = int(interval_sec / 60) if interval_sec % 60 == 0 else f"{interval_sec / 60:.1f}"
+                        log_event(f"Standalone Auto-Rejoin ({mins_label}m): Rejoining {pkg_name}...")
+                    
+                    force_stop_roblox(pkg)
+                    time.sleep(2)
+                    launch_roblox(pkg)
+                    send_status()
 
 def protect_process(package_name):
     try:
@@ -500,6 +520,7 @@ def on_message(client, userdata, msg):
                 config["isPaused"] = False
                 if "placeId" in payload: config["placeId"] = payload["placeId"]
                 if "privateServerLink" in payload: config["privateServerLink"] = payload["privateServerLink"]
+                if "autoRejoinIntervalMinutes" in payload: config["autoRejoinIntervalMinutes"] = payload["autoRejoinIntervalMinutes"]
                 with open(config_path, "w") as f:
                     json.dump(config, f, indent=2)
             except Exception:
