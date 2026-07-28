@@ -545,16 +545,10 @@ async function main() {
 
         const intervalColor = `${colors.bold}${"Auto-Rejoin:".padEnd(20)}${colors.reset}`;
         if (config.autoRejoinIntervalMinutes > 0) {
-            if (lastRejoinTime && !isRejoinerPaused) {
-                const nextRejoin = new Date(lastRejoinTime.getTime() + config.autoRejoinIntervalMinutes * 60 * 1000);
-                const remainingMs = nextRejoin.getTime() - new Date().getTime();
-                const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
-                const mins = Math.floor(remainingSecs / 60);
-                const secs = remainingSecs % 60;
-                const timeStr = `${mins}:${String(secs).padStart(2, '0')}`;
-                printInnerLine(`${intervalColor}${colors.green}Every ${config.autoRejoinIntervalMinutes} mins (Next in: ${timeStr})${colors.reset}`);
-            } else {
+            if (isRejoinerPaused) {
                 printInnerLine(`${intervalColor}${colors.yellow}Every ${config.autoRejoinIntervalMinutes} mins (PAUSED - Press 1 to start)${colors.reset}`);
+            } else {
+                printInnerLine(`${intervalColor}${colors.green}Every ${config.autoRejoinIntervalMinutes} mins${colors.reset}`);
             }
         } else {
             printInnerLine(`${intervalColor}${colors.gray}Disabled (Press 4 to set)${colors.reset}`);
@@ -567,7 +561,35 @@ async function main() {
             deviceIds.forEach((id, index) => {
                 const dev = devices[id];
 
-                const devHeaderColor = `  [${colors.bold}${colors.cyan}${index + 1}${colors.reset}] Dev: ${colors.cyan}${dev.displayName}${colors.reset} (${dev.state === "ONLINE" ? colors.green : colors.red}${dev.state}${colors.reset})`;
+                let devTimerStr = "";
+                if (!isRejoinerPaused && dev.state === "ONLINE") {
+                    const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
+                    let latestLaunchTs = dev.lastLaunchTime || 0;
+                    
+                    const devObj = (config.clientOverrides && config.clientOverrides[id]) || {};
+                    Object.keys(devObj).forEach(pKey => {
+                        const cObj = devObj[pKey];
+                        if (cObj && cObj.lastCycleTime) {
+                            let cTs = 0;
+                            if (typeof cObj.lastCycleTime === 'number') {
+                                cTs = cObj.lastCycleTime;
+                            } else {
+                                cTs = new Date(cObj.lastCycleTime).getTime() / 1000;
+                            }
+                            if (cTs > latestLaunchTs) latestLaunchTs = cTs;
+                        }
+                    });
+                    
+                    if (devIntervalMins > 0 && latestLaunchTs > 0) {
+                        const elapsedSecs = Math.max(0, Math.floor(now.getTime() / 1000 - latestLaunchTs));
+                        const remainingSecs = Math.max(0, (devIntervalMins * 60) - elapsedSecs);
+                        const m = Math.floor(remainingSecs / 60);
+                        const s = remainingSecs % 60;
+                        devTimerStr = ` ${colors.gray}(Next in: ${colors.yellow}${m}:${s.toString().padStart(2, '0')}${colors.gray})${colors.reset}`;
+                    }
+                }
+
+                const devHeaderColor = `  [${colors.bold}${colors.cyan}${index + 1}${colors.reset}] Dev: ${colors.cyan}${dev.displayName}${colors.reset} (${dev.state === "ONLINE" ? colors.green : colors.red}${dev.state}${colors.reset})${devTimerStr}`;
                 printInnerLine(devHeaderColor);
 
                 const clients = dev.installedClients || [];
@@ -1054,6 +1076,7 @@ async function main() {
                     devices[deviceId].state = "ONLINE";
 
                     if (payload.lastLaunchTime && payload.lastLaunchTime > 0) {
+                        devices[deviceId].lastLaunchTime = payload.lastLaunchTime;
                         const mobileLaunchDate = new Date(payload.lastLaunchTime * 1000);
                         if (!lastRejoinTime || mobileLaunchDate > lastRejoinTime) {
                             lastRejoinTime = mobileLaunchDate;
