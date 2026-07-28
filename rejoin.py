@@ -779,10 +779,9 @@ try:
             last_protect_time = now
                 
         for pkg in get_installed_roblox_packages():
-            if pkg not in user_ids_cache:
-                uid = get_roblox_username_or_id(pkg)
-                if uid:
-                    user_ids_cache[pkg] = uid
+            uid = get_roblox_username_or_id(pkg)
+            if uid:
+                user_ids_cache[pkg] = uid
         
         if now - last_status_send >= 5:
             send_discovery()
