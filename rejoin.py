@@ -10,9 +10,6 @@ import threading
 import re
 import urllib.request
 import ssl
-import warnings
-
-warnings.filterwarnings('ignore')
 
 colors = {
     "reset": "\033[0m",
@@ -58,14 +55,16 @@ if os.path.exists(config_path):
     try:
         with open(config_path, "r") as f:
             config.update(json.load(f))
-    except Exception:
-        pass
+        print("[+] Config loaded successfully.")
+    except Exception as e:
+        print(f"[-] Error loading config.json: {e}")
 else:
+    print("[*] config.json not found. Creating default configuration...")
     try:
         with open(config_path, "w") as f:
             json.dump(config, f, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[-] Could not write default config.json: {e}")
 
 if not config.get("connectionCode") or config["connectionCode"] == "YOUR_UNIQUE_CONNECTION_CODE" or config["connectionCode"].strip() == "":
     print(f"{colors['cyan']}[*] No connection code found.{colors['reset']}")
@@ -79,10 +78,14 @@ if not config.get("connectionCode") or config["connectionCode"] == "YOUR_UNIQUE_
         try:
             with open(config_path, "w") as f:
                 json.dump(config, f, indent=2)
-        except Exception:
-            pass
+            print(f"{colors['green']}[+] Connection code saved to config.json!{colors['reset']}")
+        except Exception as e:
+            print(f"{colors['yellow']}[*] Could not save to config.json: {e} (will use code for this session){colors['reset']}")
     except (EOFError, KeyboardInterrupt):
+        print(f"\n{colors['red']}[-] Cancelled. Exiting.{colors['reset']}")
         sys.exit(1)
+if not config.get("placeId") or config["placeId"] == 0:
+    print("[*] Warning: No 'placeId' configured yet. Waiting for PC dashboard to send it...")
 
 connection_code = config["connectionCode"]
 place_id = config["placeId"]
@@ -113,6 +116,7 @@ def get_device_id():
     return new_id
 
 device_id = get_device_id()
+print(f"[+] Device ID generated: {device_id}")
 
 discovery_topic = f"roblox/discovery/{connection_code}"
 status_topic = f"roblox/status/{connection_code}/{device_id}"
@@ -125,7 +129,7 @@ recent_logs = deque(maxlen=6)
 
 def draw_termux_ui():
     try:
-        os.system("clear")
+        sys.stdout.write("\033[H\033[2J\033[3J")
         sys.stdout.flush()
         
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
@@ -192,12 +196,11 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
-        lines = []
-        lines.append(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
-        lines.append(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
-        lines.append(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        lines.append(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        lines.append(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
+        print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
@@ -242,22 +245,17 @@ def draw_termux_ui():
                 disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
                 pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
                 
-                lines.append(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
+                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
         else:
-            lines.append(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
+            print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
-        lines.append(f"\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
+        print(f"\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
         if recent_logs:
             for item in recent_logs:
                 clean_item = item if len(item) <= 42 else item[:39] + "..."
-                lines.append(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
+                print(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
         else:
-            lines.append(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
-
-        sys.stdout.write("\033[H" + "\n".join(lines) + "\n")
-        sys.stdout.flush()
-    except Exception:
-        pass
+            print(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
     except Exception:
         pass
 
@@ -269,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2018
+SCRIPT_VERSION = 2020
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -390,12 +388,7 @@ def protect_process(package_name):
     except Exception:
         pass
 
-installed_pkgs_cache = []
-
 def get_installed_roblox_packages():
-    global installed_pkgs_cache
-    if installed_pkgs_cache:
-        return installed_pkgs_cache
     try:
         output = subprocess.check_output("pm list packages", shell=True).decode()
         packages = []
@@ -403,8 +396,7 @@ def get_installed_roblox_packages():
             if "roblox" in line.lower() or "clien" in line.lower():
                 pkg = line.replace("package:", "").strip()
                 packages.append(pkg)
-        installed_pkgs_cache = sorted(packages)
-        return installed_pkgs_cache
+        return sorted(packages)
     except Exception:
         return []
 
@@ -517,10 +509,7 @@ def update_targeted_packages(packages):
             log_states.pop(pkg, None)
     log_event(f"Targeted packages set ({len(packages)})")
 
-try:
-    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
-except Exception:
-    mqtt_client = mqtt.Client()
+mqtt_client = mqtt.Client()
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -668,8 +657,6 @@ def on_message(client, userdata, msg):
                     log_event("Update applied! Restarting script...")
                     time.sleep(1)
                     os.execv(sys.executable, [sys.executable, script_path])
-                else:
-                    log_event("Remote update check: No valid code received.")
             except Exception as e:
                 log_event(f"Remote update failed: {e}")
 
@@ -731,7 +718,7 @@ mqtt_client.loop_start()
 
 os.system("stty sane")
 if is_paused:
-    log_event("Cleaning up any leftover Roblox processes on startup...")
+    print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup...{colors['reset']}")
     for pkg in get_installed_roblox_packages():
         force_stop_roblox(pkg)
     log_event("Startup cleanup completed.")
@@ -740,7 +727,7 @@ else:
 check_self_update()
 
 threading.Thread(target=phone_cycle_worker, daemon=True).start()
-log_event("Monitoring & Standalone PS Cycle loop started.")
+print(f"{colors['yellow']}[*] Monitoring & Standalone PS Cycle loop started. Press Ctrl+C to exit.{colors['reset']}")
 
 last_status_send = 0
 last_ui_draw = 0
