@@ -259,7 +259,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2005
+SCRIPT_VERSION = 2006
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -315,6 +315,7 @@ def phone_cycle_worker():
                 if auto_min and auto_min > 0:
                     interval_sec = int(auto_min * 60)
             
+            if interval_sec and interval_sec > 0:
                 last_cycle = override.get("lastCycleTime", 0) if isinstance(override, dict) else 0
                 last_cycle_ts = 0
                 if isinstance(last_cycle, (int, float)):
