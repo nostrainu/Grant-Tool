@@ -257,13 +257,14 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
-        print(f" {colors['cyan']}╔══════════════════════════════════════╗{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Cpu:{colors['reset']} {cpu_p:<5}% │ {colors['bold']}Ram:{colors['reset']} {ram_str:<17} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}╠══════════════════════════════════════╣{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<22} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<22}{colors['reset']} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<22}{colors['reset']} {colors['cyan']}║{colors['reset']}")
-        print(f" {colors['cyan']}╚══════════════════════════════════════╝{colors['reset']}\n")
+        ram_str = f"{used_ram:.2f}/{total_ram:.2f}G"
+        print(f" {colors['cyan']}╔═════════════════════════════════╗{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Cpu:{colors['reset']}{cpu_p:<5}%│{colors['bold']}Ram:{colors['reset']}{ram_str:<17}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}╠═════════════════════════════════╣{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<19}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}╚═════════════════════════════════╝{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
