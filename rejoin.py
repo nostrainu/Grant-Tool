@@ -132,12 +132,57 @@ def draw_termux_ui():
         sys.stdout.write("\033[H\033[2J\033[3J")
         sys.stdout.flush()
         
-        status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
-        status_color = colors['yellow'] if is_paused else colors['green']
+        auto_text = ""
+        auto_color = colors['gray']
+        if is_paused:
+            auto_text = "PAUSED"
+            auto_color = colors['yellow']
+        else:
+            now_ts = time.time()
+            min_rem = None
+            active_interval = None
+            
+            for pkg in targeted_packages:
+                ov = client_overrides.get(pkg, {}) if isinstance(client_overrides, dict) else {}
+                interval_sec = None
+                if isinstance(ov, dict):
+                    interval_sec = ov.get("cycleIntervalSeconds")
+                    if not interval_sec and ov.get("cycleIntervalMinutes"):
+                        interval_sec = int(ov.get("cycleIntervalMinutes") * 60)
+                if not interval_sec:
+                    auto_min = config.get("autoRejoinIntervalMinutes", 0)
+                    if auto_min and auto_min > 0:
+                        interval_sec = int(auto_min * 60)
+                
+                if interval_sec and interval_sec > 0:
+                    last_c = ov.get("lastCycleTime", 0) if isinstance(ov, dict) else 0
+                    if last_c > 0:
+                        rem = max(0, interval_sec - int(now_ts - last_c))
+                        if min_rem is None or rem < min_rem:
+                            min_rem = rem
+                            active_interval = interval_sec
+                    else:
+                        min_rem = 0
+                        active_interval = interval_sec
+
+            if min_rem is not None and active_interval:
+                m_label = f"{int(active_interval / 60)}m" if active_interval % 60 == 0 else f"{active_interval / 60:.1f}m"
+                if min_rem < 60:
+                    rem_str = f"{min_rem}s"
+                else:
+                    r_m = min_rem // 60
+                    r_s = min_rem % 60
+                    rem_str = f"{r_m}:{r_s:02d}"
+                auto_text = f"Every {m_label} (Next in: {rem_str})"
+                auto_color = colors['green']
+            else:
+                auto_text = "Disabled"
+                auto_color = colors['gray']
 
         print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
         print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
         print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
+        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
         print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
@@ -585,7 +630,8 @@ def send_status():
         "placeId": place_id,
         "installedClients": get_installed_roblox_packages(),
         "activeClients": targeted_packages,
-        "isPaused": is_paused
+        "isPaused": is_paused,
+        "clientOverrides": client_overrides
     }
     try:
         mqtt_client.publish(status_topic, json.dumps(status_payload))

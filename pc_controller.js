@@ -1062,6 +1062,32 @@ async function main() {
                         }
                     }
 
+                    if (payload.clientOverrides && typeof payload.clientOverrides === 'object') {
+                        if (!config.clientOverrides) config.clientOverrides = {};
+                        if (!config.clientOverrides[deviceId]) config.clientOverrides[deviceId] = {};
+                        let overrideChanged = false;
+                        Object.keys(payload.clientOverrides).forEach(pkg => {
+                            const pObj = payload.clientOverrides[pkg];
+                            if (pObj && pObj.lastCycleTime) {
+                                if (!config.clientOverrides[deviceId][pkg]) {
+                                    config.clientOverrides[deviceId][pkg] = {};
+                                }
+                                const targetObj = config.clientOverrides[deviceId][pkg];
+                                const phoneTime = typeof pObj.lastCycleTime === 'number' ? new Date(pObj.lastCycleTime * 1000).toISOString() : pObj.lastCycleTime;
+                                if (targetObj.lastCycleTime !== phoneTime) {
+                                    targetObj.lastCycleTime = phoneTime;
+                                    overrideChanged = true;
+                                }
+                                if (pObj.currentPSIndex !== undefined) {
+                                    targetObj.currentPSIndex = pObj.currentPSIndex;
+                                }
+                            }
+                        });
+                        if (overrideChanged) {
+                            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+                        }
+                    }
+
                     if (payload.activeClients) {
                         const pcList = devices[deviceId].activeClients || [];
                         const phoneList = payload.activeClients;
