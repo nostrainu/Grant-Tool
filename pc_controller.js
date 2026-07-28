@@ -1206,15 +1206,7 @@ async function main() {
             if (key.name === 'r') {
                 isRejoinerPaused = false;
                 config.rejoinerActive = true;
-                const rNow = new Date();
-                lastRejoinTime = rNow;
-                config.lastRejoinTime = rNow.toISOString();
-                if (config.clientOverrides && config.clientOverrides[configuringDevice.deviceId]) {
-                    const devObj = config.clientOverrides[configuringDevice.deviceId];
-                    Object.keys(devObj).forEach(pKey => {
-                        if (devObj[pKey]) devObj[pKey].lastCycleTime = rNow.toISOString();
-                    });
-                }
+                configuringDevice.isPaused = true;
                 try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
 
                 const devOverrides = getOverridesForDevice(configuringDevice.deviceId);
@@ -1223,8 +1215,7 @@ async function main() {
                     placeId: config.placeId,
                     privateServerLink: config.privateServerLink || "",
                     clientOverrides: devOverrides,
-                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0,
-                    rejoinTimestamp: rNow.getTime() / 1000
+                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
                 }));
                 lastActionNotice = `${colors.green}[R] REJOIN command sent to ${configuringDevice.displayName}.${colors.reset}`;
                 configuringDevice = null;
@@ -1268,30 +1259,18 @@ async function main() {
 
         if (key.name === '1') {
             isRejoinerPaused = false;
-            lastRejoinTime = new Date();
             config.rejoinerActive = true;
-            config.lastRejoinTime = lastRejoinTime.toISOString();
-            if (config.clientOverrides) {
-                Object.keys(config.clientOverrides).forEach(dKey => {
-                    const dObj = config.clientOverrides[dKey];
-                    if (dObj && typeof dObj === 'object') {
-                        Object.keys(dObj).forEach(pKey => {
-                            if (dObj[pKey]) dObj[pKey].lastCycleTime = lastRejoinTime.toISOString();
-                        });
-                    }
-                });
-            }
             try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
             const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
             onlineDevs.forEach(dev => {
+                dev.isPaused = true;
                 const devOverrides = getOverridesForDevice(dev.deviceId);
                 client.publish(`${controlDevicePrefix}${dev.deviceId}`, JSON.stringify({
                     command: "rejoin",
                     placeId: config.placeId,
                     privateServerLink: config.privateServerLink || "",
                     clientOverrides: devOverrides,
-                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0,
-                    rejoinTimestamp: lastRejoinTime.getTime() / 1000
+                    autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
                 }));
             });
             lastActionNotice = `${colors.green}[1] REJOIN command sent to ${onlineDevs.length} online device(s).${colors.reset}`;
