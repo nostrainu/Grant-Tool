@@ -536,8 +536,11 @@ async function main() {
         const roomColor = `${colors.bold}${"Room Code:".padEnd(20)}${colors.reset}${colors.green}${connectionCode}${colors.reset}`;
         printInnerLine(roomColor);
 
+        const hasActiveDevice = Object.values(devices).some(d => d.state === "ONLINE" && d.isPaused === false);
+        const isSystemActive = !isRejoinerPaused || hasActiveDevice;
+
         const statusLabel = `${colors.bold}${"Rejoiner Status:".padEnd(20)}${colors.reset}`;
-        if (isRejoinerPaused) {
+        if (!isSystemActive) {
             printInnerLine(`${statusLabel}${colors.yellow}${colors.bold}STOPPED / PAUSED${colors.reset} ${colors.gray}(Press 1 to start)${colors.reset}`);
         } else {
             printInnerLine(`${statusLabel}${colors.green}${colors.bold}ACTIVE & MONITORING${colors.reset}`);
@@ -545,7 +548,7 @@ async function main() {
 
         const intervalColor = `${colors.bold}${"Auto-Rejoin:".padEnd(20)}${colors.reset}`;
         if (config.autoRejoinIntervalMinutes > 0) {
-            if (isRejoinerPaused) {
+            if (!isSystemActive) {
                 printInnerLine(`${intervalColor}${colors.yellow}Every ${config.autoRejoinIntervalMinutes} mins (PAUSED - Press 1 to start)${colors.reset}`);
             } else {
                 printInnerLine(`${intervalColor}${colors.green}Every ${config.autoRejoinIntervalMinutes} mins${colors.reset}`);
