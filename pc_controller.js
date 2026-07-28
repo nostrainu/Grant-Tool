@@ -1142,7 +1142,7 @@ async function main() {
                 }
             }
 
-            if (!selectingDevice && !configuringDevice && !updatingConfig) {
+            if (!selectingDevice && !configuringDevice && !updatingConfig && !managingRAM) {
                 drawUI();
             }
         } catch (e) {
@@ -1154,8 +1154,169 @@ async function main() {
         process.stdin.setRawMode(true);
     }
 
+    let managingRAM = false;
+
+    function getRAMAccounts() {
+        let ramPath = config.ramPath || "";
+        const possiblePaths = [
+            ramPath,
+            path.join(process.cwd(), "AccountData.json"),
+            "C:\\Users\\mj\\Desktop\\RAM\\AccountData.json",
+            "C:\\Users\\mj\\Downloads\\RAM\\AccountData.json",
+            "C:\\RAM\\AccountData.json"
+        ];
+        for (let p of possiblePaths) {
+            if (p && fs.existsSync(p)) {
+                try {
+                    let stat = fs.statSync(p);
+                    if (stat.isDirectory()) {
+                        p = path.join(p, "AccountData.json");
+                    }
+                    if (fs.existsSync(p)) {
+                        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+                        let accs = [];
+                        if (Array.isArray(data)) {
+                            accs = data;
+                        } else if (data && typeof data === 'object') {
+                            Object.keys(data).forEach(k => {
+                                if (data[k] && typeof data[k] === 'object') {
+                                    accs.push(data[k]);
+                                }
+                            });
+                        }
+                        if (accs.length > 0) return { accounts: accs, path: p };
+                    }
+                } catch (e) { }
+            }
+        }
+        return { accounts: [], path: "" };
+    }
+
+    function openRAMAccountManager() {
+        managingRAM = true;
+        drawRAMMenu();
+    }
+
+    function drawRAMMenu() {
+        process.stdout.write('\u001b[2J\u001b[H');
+        const ramInfo = getRAMAccounts();
+        const accs = ramInfo.accounts;
+        const p = ramInfo.path;
+
+        console.log(`\n ${colors.cyan}╔══════ ROBLOX ACCOUNT MANAGER (RAM) ═══════════════════════════════════════╗${colors.reset}\n`);
+        if (p) {
+            console.log(`  ${colors.green}[+] RAM Data Found:${colors.reset} ${p}`);
+            console.log(`  ${colors.bold}Total RAM Accounts Detected:${colors.reset} ${accs.length}\n`);
+            accs.forEach((acc, i) => {
+                const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
+                const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
+                const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
+                console.log(`   [${i+1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
+            });
+        } else {
+            console.log(`  ${colors.red}[-] RAM AccountData.json not found.${colors.reset}`);
+            console.log(`  ${colors.gray}Please set your RAM folder path [P] or place AccountData.json in your project folder.${colors.reset}`);
+        }
+
+        console.log(`\n  ${colors.bold}OPTIONS:${colors.reset}`);
+        if (accs.length > 0) {
+            console.log(`   [A] ${colors.green}${colors.bold}Auto-Assign RAM Accounts to All Connected Devices${colors.reset}`);
+        }
+        console.log(`   [P] Set Custom RAM Folder Path`);
+        console.log(`   [C] Cancel / Return to Dashboard`);
+        console.log(`\n ${colors.bold}${colors.green}Press [A, P, or C]:${colors.reset} `);
+    }
+
+    function setRAMPathPrompt() {
+        updatingConfig = true;
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        console.log(`\n  ${colors.cyan}Set RAM Folder Path (e.g. C:\\Users\\mj\\Desktop\\RAM):${colors.reset}`);
+        rl.question("  Folder Path: ", function (answer) {
+            rl.close();
+            updatingConfig = false;
+            const cleanPath = answer.trim();
+            if (cleanPath) {
+                config.ramPath = cleanPath;
+                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+                lastActionNotice = `${colors.green}RAM path updated to: ${cleanPath}${colors.reset}`;
+            }
+            openRAMAccountManager();
+        });
+    }
+
+    function autoAssignRAMAccountsToAll() {
+        const ramInfo = getRAMAccounts();
+        const accs = ramInfo.accounts;
+        if (accs.length === 0) {
+            lastActionNotice = `${colors.red}No RAM accounts available to assign.${colors.reset}`;
+            drawUI();
+            return;
+        }
+
+        let assignedCount = 0;
+        const onlineDevs = Object.values(devices).filter(d => d.state === "ONLINE");
+        if (!config.clientOverrides) config.clientOverrides = {};
+
+        onlineDevs.forEach(dev => {
+            if (!config.clientOverrides[dev.deviceId]) config.clientOverrides[dev.deviceId] = {};
+            const clients = dev.installedClients || [];
+            clients.forEach(pkg => {
+                if (assignedCount < accs.length) {
+                    const acc = accs[assignedCount];
+                    const cookie = acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY || "";
+                    const username = acc.Username || acc.Name || acc.username || "";
+                    
+                    if (!config.clientOverrides[dev.deviceId][pkg]) config.clientOverrides[dev.deviceId][pkg] = {};
+                    if (cookie) config.clientOverrides[dev.deviceId][pkg].cookie = cookie;
+                    if (username) config.clientOverrides[dev.deviceId][pkg].username = username;
+
+                    assignedCount++;
+                }
+            });
+        });
+
+        try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+
+        onlineDevs.forEach(dev => {
+            const devOverrides = getOverridesForDevice(dev.deviceId);
+            client.publish(`${controlDevicePrefix}${dev.deviceId}`, JSON.stringify({
+                command: "rejoin",
+                placeId: config.placeId,
+                privateServerLink: config.privateServerLink || "",
+                clientOverrides: devOverrides,
+                autoRejoinIntervalMinutes: config.autoRejoinIntervalMinutes || 0
+            }));
+        });
+
+        lastActionNotice = `${colors.green}[RAM] Assigned ${assignedCount} account(s) across connected mobile devices.${colors.reset}`;
+        drawUI();
+    }
+
     function keypressHandler(str, key) {
         if (updatingConfig) return;
+
+        if (managingRAM) {
+            if (key.ctrl && key.name === 'c' || key.name === 'c' || key.name === 'escape') {
+                managingRAM = false;
+                drawUI();
+                return;
+            }
+            if (key.name === 'p') {
+                managingRAM = false;
+                setRAMPathPrompt();
+                return;
+            }
+            if (key.name === 'a') {
+                managingRAM = false;
+                autoAssignRAMAccountsToAll();
+                return;
+            }
+            return;
+        }
 
         if (selectingDevice) {
             if (key.ctrl && key.name === 'c' || key.name === 'q') {
@@ -1349,8 +1510,7 @@ async function main() {
             lastActionNotice = `${colors.green}[8] UPDATE command broadcast to mobile device(s).${colors.reset}`;
             drawUI();
         } else if (key.name === '9') {
-            lastActionNotice = `${colors.green}[9] RAM triggered.${colors.reset}`;
-            drawUI();
+            openRAMAccountManager();
         }
     }
 
