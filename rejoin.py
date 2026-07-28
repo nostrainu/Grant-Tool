@@ -129,11 +129,49 @@ from collections import deque
 
 recent_logs = deque(maxlen=6)
 
+def get_sys_stats():
+    cpu_pct = 0.0
+    try:
+        with open("/proc/stat", "r") as f:
+            fields = [float(x) for x in f.readline().split()[1:]]
+        idle_time = fields[3] + fields[4]
+        total_time = sum(fields)
+        if hasattr(get_sys_stats, "_prev_total") and get_sys_stats._prev_total > 0:
+            idle_delta = idle_time - get_sys_stats._prev_idle
+            total_delta = total_time - get_sys_stats._prev_total
+            if total_delta > 0:
+                cpu_pct = max(0.0, min(100.0, (1.0 - idle_delta / total_delta) * 100.0))
+        get_sys_stats._prev_idle = idle_time
+        get_sys_stats._prev_total = total_time
+    except Exception:
+        pass
+
+    used_gb, total_gb = 0.0, 0.0
+    try:
+        with open("/proc/meminfo", "r") as f:
+            lines = f.readlines()
+        mem = {}
+        for line in lines:
+            parts = line.split(":")
+            if len(parts) == 2:
+                mem[parts[0].strip()] = int(parts[1].strip().split()[0])
+        total_kb = mem.get("MemTotal", 0)
+        avail_kb = mem.get("MemAvailable", mem.get("MemFree", 0))
+        total_gb = total_kb / 1024 / 1024
+        used_gb = (total_kb - avail_kb) / 1024 / 1024
+    except Exception:
+        pass
+
+    return round(cpu_pct, 1), round(used_gb, 2), round(total_gb, 2)
+
 def draw_termux_ui():
     try:
         sys.stdout.write("\033[H\033[2J\033[3J")
         sys.stdout.flush()
         
+        cpu_p, used_ram, total_ram = get_sys_stats()
+        ram_str = f"{used_ram:.2f}/{total_ram:.2f}G"
+
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
         status_color = colors['yellow'] if is_paused else colors['green']
         
@@ -199,6 +237,8 @@ def draw_termux_ui():
                 auto_color = colors['gray']
 
         print(f" {colors['cyan']}╔═════════════════════════════════╗{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Cpu:{colors['reset']}{cpu_p:<5}%│{colors['bold']}Ram:{colors['reset']}{ram_str:<17}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}╠═════════════════════════════════╣{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<19}{colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
