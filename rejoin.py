@@ -159,8 +159,22 @@ def draw_termux_ui():
                 
                 if interval_sec and interval_sec > 0:
                     last_c = ov.get("lastCycleTime", 0) if isinstance(ov, dict) else 0
-                    if last_c > 0:
-                        rem = max(0, interval_sec - int(now_ts - last_c))
+                    last_c_ts = 0
+                    if isinstance(last_c, (int, float)):
+                        last_c_ts = last_c
+                    elif isinstance(last_c, str):
+                        try:
+                            if last_c.replace('.', '', 1).isdigit():
+                                last_c_ts = float(last_c)
+                            else:
+                                import datetime
+                                dt = datetime.datetime.fromisoformat(last_c.replace('Z', '+00:00'))
+                                last_c_ts = dt.timestamp()
+                        except Exception:
+                            last_c_ts = 0
+
+                    if last_c_ts > 0:
+                        rem = max(0, interval_sec - int(now_ts - last_c_ts))
                         if min_rem is None or rem < min_rem:
                             min_rem = rem
                             active_interval = interval_sec
@@ -299,14 +313,27 @@ def phone_cycle_worker():
                 if auto_min and auto_min > 0:
                     interval_sec = int(auto_min * 60)
             
-            if interval_sec and interval_sec > 0:
                 last_cycle = override.get("lastCycleTime", 0) if isinstance(override, dict) else 0
-                if last_cycle == 0:
+                last_cycle_ts = 0
+                if isinstance(last_cycle, (int, float)):
+                    last_cycle_ts = last_cycle
+                elif isinstance(last_cycle, str):
+                    try:
+                        if last_cycle.replace('.', '', 1).isdigit():
+                            last_cycle_ts = float(last_cycle)
+                        else:
+                            import datetime
+                            dt = datetime.datetime.fromisoformat(last_cycle.replace('Z', '+00:00'))
+                            last_cycle_ts = dt.timestamp()
+                    except Exception:
+                        last_cycle_ts = 0
+
+                if last_cycle_ts == 0:
                     if not isinstance(override, dict):
                         override = {}
                     override["lastCycleTime"] = now_ts
                     client_overrides[pkg] = override
-                elif (now_ts - last_cycle) >= interval_sec:
+                elif (now_ts - last_cycle_ts) >= interval_sec:
                     cur_idx = override.get("currentPSIndex", 0) if isinstance(override, dict) else 0
                     if ps_list and len(ps_list) > 0:
                         next_idx = (cur_idx + 1) % len(ps_list)
