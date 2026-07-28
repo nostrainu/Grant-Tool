@@ -267,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2010
+SCRIPT_VERSION = 2012
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -367,14 +367,15 @@ def phone_cycle_worker():
                     pkg_name = user_ids_cache.get(pkg) or pkg.split('.')[-1]
                     if ps_list and len(ps_list) > 1:
                         log_event(f"Standalone Cycle: Rotating {pkg_name} to PS #{next_idx + 1}/{len(ps_list)}")
+                        force_stop_roblox(pkg)
+                        time.sleep(2)
+                        launch_roblox(pkg)
+                        send_status()
                     else:
                         mins_label = int(interval_sec / 60) if interval_sec % 60 == 0 else f"{interval_sec / 60:.1f}"
-                        log_event(f"Standalone Auto-Rejoin ({mins_label}m): Rejoining {pkg_name}...")
-                    
-                    force_stop_roblox(pkg)
-                    time.sleep(2)
-                    launch_roblox(pkg)
-                    send_status()
+                        log_event(f"Standalone Auto-Rejoin ({mins_label}m)...")
+                        threading.Thread(target=run_rejoin_sequence, args=({},), daemon=True).start()
+                        break
 
 def protect_process(package_name):
     try:
@@ -529,32 +530,26 @@ def run_rejoin_sequence(payload):
     stop_requested = False
     log_event("Starting sequential rejoin...")
     
-    if "placeId" in payload:
-        place_id = payload["placeId"]
-    if "privateServerLink" in payload:
-        private_server_link = payload["privateServerLink"]
+    if isinstance(payload, dict):
+        if "placeId" in payload:
+            place_id = payload["placeId"]
+        if "privateServerLink" in payload:
+            private_server_link = payload["privateServerLink"]
+        client_overrides = payload.get("clientOverrides", client_overrides)
     
-    client_overrides = payload.get("clientOverrides", {})
-    
+    log_event("Closing all active Roblox clients...")
     for pkg in targeted_packages:
         if stop_requested:
             is_rejoining = False
             log_event("Rejoin sequence canceled.")
             return
-
         force_stop_roblox(pkg)
-        update_running_states_cache()
-        send_status()
-        
-        for _ in range(2):
-            if stop_requested:
-                is_rejoining = False
-                log_event("Rejoin sequence canceled.")
-                return
-            time.sleep(1)
-            update_running_states_cache()
-            send_status()
-            
+    
+    update_running_states_cache()
+    send_status()
+    time.sleep(3)
+
+    for pkg in targeted_packages:
         if stop_requested:
             is_rejoining = False
             log_event("Rejoin sequence canceled.")
@@ -564,7 +559,7 @@ def run_rejoin_sequence(payload):
         update_running_states_cache()
         send_status()
         
-        for _ in range(10):
+        for _ in range(8):
             if stop_requested:
                 is_rejoining = False
                 log_event("Rejoin sequence canceled.")
