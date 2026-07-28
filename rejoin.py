@@ -435,7 +435,8 @@ def get_installed_roblox_packages():
         output = subprocess.check_output("pm list packages", shell=True).decode()
         packages = []
         for line in output.splitlines():
-            if "roblox" in line.lower() or "clien" in line.lower():
+            pkg_lower = line.lower()
+            if any(k in pkg_lower for k in ["roblox", "clien", "noka", "delta"]):
                 pkg = line.replace("package:", "").strip()
                 packages.append(pkg)
         return sorted(packages)
@@ -457,6 +458,8 @@ def get_roblox_username_or_id(package_name):
         pass
 
     last_char = package_name[-1].upper() if package_name else "X"
+    if "noka" in package_name.lower():
+        return f"Noka {last_char}"
     return f"Client {last_char}"
 
 
