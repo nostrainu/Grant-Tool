@@ -8,3 +8,4 @@ usernames.json
 Grant.exe
 *.zip
 build_zip.ps1
+inspect_roblox.py

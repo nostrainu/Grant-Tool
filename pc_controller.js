@@ -687,7 +687,8 @@ async function main() {
         console.log(`\n ${colors.bold}${colors.cyan}CONTROLS:${colors.reset}`);
         console.log(`  [${colors.bold}${colors.green}1${colors.reset}] Start Rejoin        [${colors.bold}${colors.green}4${colors.reset}] Rejoin Interval      [${colors.bold}${colors.green}7${colors.reset}] Stop Rejoiner`);
         console.log(`  [${colors.bold}${colors.green}2${colors.reset}] Kill Clients        [${colors.bold}${colors.green}5${colors.reset}] Set Private Server   [${colors.bold}${colors.green}8${colors.reset}] Update Devices`);
-        console.log(`  [${colors.bold}${colors.green}3${colors.reset}] Select Clients      [${colors.bold}${colors.green}6${colors.reset}] Set Roblox Place ID  [${colors.bold}${colors.green}0${colors.reset}] Quit Dashboard`);
+        console.log(`  [${colors.bold}${colors.green}3${colors.reset}] Select Clients      [${colors.bold}${colors.green}6${colors.reset}] Set Roblox Place ID  [${colors.bold}${colors.green}9${colors.reset}] RAM Account Manager`);
+        console.log(`  [${colors.bold}${colors.green}0${colors.reset}] Quit Dashboard`);
         console.log(`\n ${colors.bold}Last Action:${colors.reset} ${lastActionNotice}`);
         console.log(` ${colors.bold}${colors.green}Press a control key [0-8]:${colors.reset} `);
         process.stdout.write('\u001b[J');
@@ -1346,6 +1347,9 @@ async function main() {
                 command: "update"
             }));
             lastActionNotice = `${colors.green}[8] UPDATE command broadcast to mobile device(s).${colors.reset}`;
+            drawUI();
+        } else if (key.name === '9') {
+            lastActionNotice = `${colors.green}[9] RAM Account Manager triggered.${colors.reset}`;
             drawUI();
         }
     }

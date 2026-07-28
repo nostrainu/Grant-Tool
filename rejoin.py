@@ -10,6 +10,32 @@ import threading
 import re
 import urllib.request
 import ssl
+import sqlite3
+
+def inject_roblox_cookie(package_name, cookie_value):
+    if not cookie_value or not cookie_value.strip():
+        return False
+    cookie_value = cookie_value.strip()
+    temp_db = "/data/local/tmp/inject_cookies.db"
+    orig_db = f"/data/data/{package_name}/app_webview/Default/Cookies"
+    try:
+        res = subprocess.call(f"su -c 'cp {orig_db} {temp_db} && chmod 777 {temp_db}'", shell=True)
+        if res != 0 or not os.path.exists(temp_db):
+            return False
+        conn = sqlite3.connect(temp_db)
+        c = conn.cursor()
+        c.execute("DELETE FROM cookies WHERE name = '.ROBLOSECURITY';")
+        c.execute("""INSERT OR REPLACE INTO cookies 
+            (creation_utc, host_key, top_frame_site_key, name, value, path, expires_utc, is_secure, is_httponly, last_access_utc, has_expires, is_persistent, priority, samesite, source_scheme, source_port, is_same_party)
+            VALUES (13300000000000000, '.roblox.com', '', '.ROBLOSECURITY', ?, '/', 13600000000000000, 1, 1, 13300000000000000, 1, 1, 1, -1, 2, 443, 0);""", (cookie_value,))
+        conn.commit()
+        conn.close()
+        subprocess.call(f"su -c 'cp {temp_db} {orig_db} && chmod 660 {orig_db} && rm -f {temp_db}'", shell=True)
+        log_event(f"Injected .ROBLOSECURITY cookie for {package_name}")
+        return True
+    except Exception as e:
+        log_event(f"Cookie injection error for {package_name}: {e}")
+        return False
 
 colors = {
     "reset": "\033[0m",
@@ -267,7 +293,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2040
+SCRIPT_VERSION = 2050
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -473,6 +499,9 @@ def launch_roblox(package_name):
     pkg_link = private_server_link
     if 'client_overrides' in globals() and client_overrides and package_name in client_overrides:
         override = client_overrides[package_name]
+        cookie_val = override.get("cookie", "")
+        if cookie_val:
+            inject_roblox_cookie(package_name, cookie_val)
         pkg_place_id = override.get("placeId", pkg_place_id)
         ps_list = override.get("privateServerList", [])
         if ps_list and len(ps_list) > 0:
