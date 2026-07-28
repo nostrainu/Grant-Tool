@@ -562,30 +562,34 @@ async function main() {
                 const dev = devices[id];
 
                 let devTimerStr = "";
-                if (!isRejoinerPaused && dev.state === "ONLINE") {
-                    const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
-                    let latestLaunchTs = dev.lastLaunchTime || 0;
-                    
-                    const devObj = (config.clientOverrides && config.clientOverrides[id]) || {};
-                    Object.keys(devObj).forEach(pKey => {
-                        const cObj = devObj[pKey];
-                        if (cObj && cObj.lastCycleTime) {
-                            let cTs = 0;
-                            if (typeof cObj.lastCycleTime === 'number') {
-                                cTs = cObj.lastCycleTime;
-                            } else {
-                                cTs = new Date(cObj.lastCycleTime).getTime() / 1000;
+                if (dev.state === "ONLINE") {
+                    if (dev.isPaused === true && !isRejoinerPaused) {
+                        devTimerStr = ` ${colors.yellow}(Rejoining...)${colors.reset}`;
+                    } else if (!isRejoinerPaused) {
+                        const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
+                        let latestLaunchTs = dev.lastLaunchTime || 0;
+                        
+                        const devObj = (config.clientOverrides && config.clientOverrides[id]) || {};
+                        Object.keys(devObj).forEach(pKey => {
+                            const cObj = devObj[pKey];
+                            if (cObj && cObj.lastCycleTime) {
+                                let cTs = 0;
+                                if (typeof cObj.lastCycleTime === 'number') {
+                                    cTs = cObj.lastCycleTime;
+                                } else {
+                                    cTs = new Date(cObj.lastCycleTime).getTime() / 1000;
+                                }
+                                if (cTs > latestLaunchTs) latestLaunchTs = cTs;
                             }
-                            if (cTs > latestLaunchTs) latestLaunchTs = cTs;
+                        });
+                        
+                        if (devIntervalMins > 0 && latestLaunchTs > 0) {
+                            const elapsedSecs = Math.max(0, Math.floor(now.getTime() / 1000 - latestLaunchTs));
+                            const remainingSecs = Math.max(0, (devIntervalMins * 60) - elapsedSecs);
+                            const m = Math.floor(remainingSecs / 60);
+                            const s = remainingSecs % 60;
+                            devTimerStr = ` ${colors.gray}(Next in: ${colors.yellow}${m}:${s.toString().padStart(2, '0')}${colors.gray})${colors.reset}`;
                         }
-                    });
-                    
-                    if (devIntervalMins > 0 && latestLaunchTs > 0) {
-                        const elapsedSecs = Math.max(0, Math.floor(now.getTime() / 1000 - latestLaunchTs));
-                        const remainingSecs = Math.max(0, (devIntervalMins * 60) - elapsedSecs);
-                        const m = Math.floor(remainingSecs / 60);
-                        const s = remainingSecs % 60;
-                        devTimerStr = ` ${colors.gray}(Next in: ${colors.yellow}${m}:${s.toString().padStart(2, '0')}${colors.gray})${colors.reset}`;
                     }
                 }
 
@@ -1074,6 +1078,7 @@ async function main() {
                     devices[deviceId].lastLogTime = payload.logTime || devices[deviceId].lastLogTime;
                     devices[deviceId].lastSeen = new Date();
                     devices[deviceId].state = "ONLINE";
+                    devices[deviceId].isPaused = payload.isPaused;
 
                     if (payload.lastLaunchTime && payload.lastLaunchTime > 0) {
                         devices[deviceId].lastLaunchTime = payload.lastLaunchTime;
