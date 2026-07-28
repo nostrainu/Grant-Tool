@@ -259,6 +259,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
+SCRIPT_VERSION = 2005
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -267,18 +268,19 @@ def check_self_update():
         cmd = ["curl", "-sL", "--connect-timeout", "5", cache_buster_url]
         remote_code = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8', errors='ignore')
         
-        script_path = os.path.realpath(__file__)
-        with open(script_path, 'r', encoding='utf-8') as f:
-            local_code = f.read()
-            
-        if remote_code and len(remote_code) > 500 and remote_code.strip() != local_code.strip():
-            log_event("New update detected! Restarting...")
-            with open(script_path, 'w', encoding='utf-8') as f:
-                f.write(remote_code)
-            time.sleep(1)
-            os.execv(sys.executable, [sys.executable, script_path])
-        else:
-            log_event("rejoin.py is up to date.")
+        version_match = re.search(r'SCRIPT_VERSION\s*=\s*(\d+)', remote_code)
+        if version_match:
+            remote_ver = int(version_match.group(1))
+            if remote_ver > SCRIPT_VERSION:
+                log_event(f"New update v{remote_ver} detected! Restarting...")
+                script_path = os.path.realpath(__file__)
+                with open(script_path, 'w', encoding='utf-8') as f:
+                    f.write(remote_code)
+                time.sleep(1)
+                os.execv(sys.executable, [sys.executable, script_path])
+                return
+
+        log_event("rejoin.py is up to date.")
     except Exception as e:
         log_event(f"Auto-update skipped: {e}")
 
