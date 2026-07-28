@@ -1158,36 +1158,50 @@ async function main() {
 
     function getRAMAccounts() {
         let ramPath = config.ramPath || "";
-        const possiblePaths = [
+        const userHome = os.homedir ? os.homedir() : "";
+        const possibleDirs = [
             ramPath,
-            path.join(process.cwd(), "AccountData.json"),
-            "C:\\Users\\mj\\Desktop\\ram\\AccountData.json",
-            "C:\\Users\\mj\\Desktop\\ram",
-            "C:\\Users\\mj\\Desktop\\RAM\\AccountData.json",
-            "C:\\Users\\mj\\Downloads\\RAM\\AccountData.json",
-            "C:\\RAM\\AccountData.json"
+            process.cwd(),
+            userHome ? path.join(userHome, "Desktop", "ram") : "",
+            userHome ? path.join(userHome, "Desktop", "RAM") : "",
+            userHome ? path.join(userHome, "Downloads", "RAM") : "",
+            "C:\\ram",
+            "C:\\RAM"
         ];
-        for (let p of possiblePaths) {
-            if (p && fs.existsSync(p)) {
+
+        for (let d of possibleDirs) {
+            if (!d) continue;
+            let checkFile = d;
+            if (fs.existsSync(d)) {
                 try {
-                    let stat = fs.statSync(p);
+                    let stat = fs.statSync(d);
                     if (stat.isDirectory()) {
-                        p = path.join(p, "AccountData.json");
-                    }
-                    if (fs.existsSync(p)) {
-                        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-                        let accs = [];
-                        if (Array.isArray(data)) {
-                            accs = data;
-                        } else if (data && typeof data === 'object') {
-                            Object.keys(data).forEach(k => {
-                                if (data[k] && typeof data[k] === 'object') {
-                                    accs.push(data[k]);
-                                }
-                            });
+                        const files = fs.readdirSync(d);
+                        const match = files.find(f => f.toLowerCase().includes("accountdata") || f.toLowerCase() === "accounts.json");
+                        if (match) {
+                            checkFile = path.join(d, match);
+                        } else {
+                            checkFile = path.join(d, "AccountData.json");
                         }
-                        if (accs.length > 0) return { accounts: accs, path: p };
                     }
+                } catch (e) { }
+            }
+
+            if (fs.existsSync(checkFile) && !fs.statSync(checkFile).isDirectory()) {
+                try {
+                    let content = fs.readFileSync(checkFile, 'utf8').replace(/^\uFEFF/, '');
+                    let data = JSON.parse(content);
+                    let accs = [];
+                    if (Array.isArray(data)) {
+                        accs = data;
+                    } else if (data && typeof data === 'object') {
+                        Object.keys(data).forEach(k => {
+                            if (data[k] && typeof data[k] === 'object') {
+                                accs.push(data[k]);
+                            }
+                        });
+                    }
+                    if (accs.length > 0) return { accounts: accs, path: checkFile };
                 } catch (e) { }
             }
         }
@@ -1216,45 +1230,69 @@ async function main() {
                 console.log(`   [${i+1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
             });
         } else {
-            console.log(`  ${colors.red}[-] RAM AccountData.json not found.${colors.reset}`);
-            console.log(`  ${colors.gray}Please set your RAM folder path [P] or place AccountData.json in your project folder.${colors.reset}`);
+            console.log(`  ${colors.red}[-] RAM AccountData file not found.${colors.reset}`);
+            console.log(`  ${colors.gray}Press [P] to paste your RAM folder path from clipboard.${colors.reset}`);
         }
 
         console.log(`\n  ${colors.bold}OPTIONS:${colors.reset}`);
         if (accs.length > 0) {
             console.log(`   [A] ${colors.green}${colors.bold}Auto-Assign RAM Accounts to All Connected Devices${colors.reset}`);
         }
-        console.log(`   [P] Set Custom RAM Folder Path`);
+        console.log(`   [P] Set / Paste RAM Folder Path from Clipboard`);
         console.log(`   [C] Cancel / Return to Dashboard`);
         console.log(`\n ${colors.bold}${colors.green}Press [A, P, or C]:${colors.reset} `);
     }
 
-    function setRAMPathPrompt() {
+    async function setRAMPathPrompt() {
         updatingConfig = true;
-        if (process.stdin.isTTY) {
-            process.stdin.setRawMode(false);
-        }
-        process.stdout.write('\u001b[2J\u001b[H');
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
+        process.stdout.write('\u001b[?1049l\u001b[?25h');
+        console.clear();
 
-        console.log(`\n  ${colors.cyan}Set RAM Folder Path (e.g. C:\\Users\\mj\\Desktop\\ram):${colors.reset}`);
-        rl.question("  Folder Path: ", function (answer) {
-            rl.close();
-            if (process.stdin.isTTY) {
-                process.stdin.setRawMode(true);
+        const currentPath = config.ramPath || "None";
+        const clipboardRaw = getClipboardText().replace(/[\r\n]+/g, "").replace(/^["']|["']$/g, '').trim();
+        const dispClip = clipboardRaw ? (clipboardRaw.length > 45 ? "..." + clipboardRaw.slice(-40) : clipboardRaw) : "Empty";
+
+        console.log(`\n ${colors.cyan}╔══════ CONFIGURE RAM FOLDER PATH ═══════════════════════════════════════╗${colors.reset}\n`);
+        console.log(`  ${colors.bold}Current RAM Path:${colors.reset}   ${colors.green}${currentPath}${colors.reset}`);
+        console.log(`  ${colors.bold}Clipboard Content:${colors.reset} ${colors.gray}${dispClip}${colors.reset}\n`);
+        console.log(`  [${colors.bold}1${colors.reset}] Paste Path from Clipboard (or press Enter)`);
+        console.log(`  [${colors.bold}2${colors.reset}] Enter Path Manually`);
+        console.log(`  [${colors.bold}C${colors.reset}] Cancel and Return\n`);
+
+        const ans = await askQuestion(` Select option (1-2, or press Enter to paste): `);
+        const choice = ans.trim().toLowerCase();
+
+        if (choice === '1' || choice === '' || choice === 'p') {
+            if (clipboardRaw) {
+                config.ramPath = clipboardRaw;
+                try {
+                    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                    console.log(`\n ${colors.green}[+] RAM Path updated from clipboard!${colors.reset}`);
+                    console.log(`     Path: ${config.ramPath}`);
+                    lastActionNotice = `${colors.green}RAM Path updated from clipboard: ${config.ramPath}${colors.reset}`;
+                } catch (e) {
+                    console.error("[-] Failed to save config:", e.message);
+                }
+            } else {
+                console.log(`\n ${colors.red}[!] Clipboard is empty or invalid.${colors.reset}`);
             }
-            updatingConfig = false;
-            const cleanPath = answer.trim();
+            await new Promise(resolve => setTimeout(resolve, 1200));
+        } else if (choice === '2') {
+            const manualAns = await askQuestion(` Enter RAM Folder Path: `);
+            const cleanPath = manualAns.trim().replace(/^["']|["']$/g, '');
             if (cleanPath) {
                 config.ramPath = cleanPath;
-                try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
-                lastActionNotice = `${colors.green}RAM path updated to: ${cleanPath}${colors.reset}`;
+                try {
+                    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                    console.log(`\n ${colors.green}[+] RAM Path saved!${colors.reset}`);
+                    lastActionNotice = `${colors.green}RAM Path saved: ${config.ramPath}${colors.reset}`;
+                } catch (e) { }
             }
-            openRAMAccountManager();
-        });
+            await new Promise(resolve => setTimeout(resolve, 1200));
+        }
+
+        updatingConfig = false;
+        openRAMAccountManager();
     }
 
     function autoAssignRAMAccountsToAll() {
