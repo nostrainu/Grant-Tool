@@ -132,6 +132,9 @@ def draw_termux_ui():
         sys.stdout.write("\033[H\033[2J\033[3J")
         sys.stdout.flush()
         
+        status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
+        status_color = colors['yellow'] if is_paused else colors['green']
+        
         auto_text = ""
         auto_color = colors['gray']
         if is_paused:
