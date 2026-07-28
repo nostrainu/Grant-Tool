@@ -11,6 +11,16 @@ import re
 import urllib.request
 import ssl
 
+colors = {
+    "reset": "\033[0m",
+    "bold": "\033[1m",
+    "green": "\033[32m",
+    "yellow": "\033[33m",
+    "red": "\033[31m",
+    "cyan": "\033[36m",
+    "gray": "\033[90m"
+}
+
 pid_file = "rejoin.pid"
 if os.path.exists(pid_file):
     try:
@@ -112,16 +122,6 @@ discovery_topic = f"roblox/discovery/{connection_code}"
 status_topic = f"roblox/status/{connection_code}/{device_id}"
 control_device_topic = f"roblox/control/{connection_code}/{device_id}"
 control_all_topic = f"roblox/control/{connection_code}/all"
-
-colors = {
-    "reset": "\033[0m",
-    "bold": "\033[1m",
-    "green": "\033[32m",
-    "yellow": "\033[33m",
-    "red": "\033[31m",
-    "cyan": "\033[36m",
-    "gray": "\033[90m"
-}
 
 from collections import deque
 
