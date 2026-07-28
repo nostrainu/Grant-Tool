@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os
 import sys
 import time
@@ -181,7 +180,6 @@ def optimize_redfinger_device():
     except Exception:
         pass
 
-# Run system animation & memory optimizations on script startup
 try:
     threading.Thread(target=optimize_redfinger_device, daemon=True).start()
 except Exception:
@@ -193,9 +191,7 @@ def draw_termux_ui():
         sys.stdout.flush()
         
         cpu_p, used_ram, total_ram = get_sys_stats()
-        print("--------------------------------------------------------------------------------")
-        print(f"| Cpu usage: {cpu_p:<5}% | Ram usage: {used_ram:.2f} / {total_ram:.2f} GB |")
-        print("--------------------------------------------------------------------------------")
+        ram_str = f"{used_ram:.2f} / {total_ram:.2f} GB"
 
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
         status_color = colors['yellow'] if is_paused else colors['green']
@@ -261,11 +257,13 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
-        print(f" {colors['cyan']}\u2554\u2550\u2550\u2550\u2550\u2550\u2550 Grant Mobile \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<30} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u2551{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<30}{colors['reset']} {colors['cyan']}\u2551{colors['reset']}")
-        print(f" {colors['cyan']}\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d{colors['reset']}\n")
+        print(f" {colors['cyan']}┌──────────────────────────────────────────────────────────┐{colors['reset']}")
+        print(f" {colors['cyan']}│{colors['reset']} {colors['bold']}Cpu usage:{colors['reset']} {cpu_p:<5}%     {colors['cyan']}│{colors['reset']} {colors['bold']}Ram usage:{colors['reset']} {ram_str:<23} {colors['cyan']}│{colors['reset']}")
+        print(f" {colors['cyan']}├──────────────────────────────────────────────────────────┤{colors['reset']}")
+        print(f" {colors['cyan']}│{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<43} {colors['cyan']}│{colors['reset']}")
+        print(f" {colors['cyan']}│{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<43}{colors['reset']} {colors['cyan']}│{colors['reset']}")
+        print(f" {colors['cyan']}│{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<43}{colors['reset']} {colors['cyan']}│{colors['reset']}")
+        print(f" {colors['cyan']}└──────────────────────────────────────────────────────────┘{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
