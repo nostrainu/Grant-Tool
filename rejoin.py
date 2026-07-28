@@ -58,16 +58,14 @@ if os.path.exists(config_path):
     try:
         with open(config_path, "r") as f:
             config.update(json.load(f))
-        print("[+] Config loaded successfully.")
-    except Exception as e:
-        print(f"[-] Error loading config.json: {e}")
+    except Exception:
+        pass
 else:
-    print("[*] config.json not found. Creating default configuration...")
     try:
         with open(config_path, "w") as f:
             json.dump(config, f, indent=2)
-    except Exception as e:
-        print(f"[-] Could not write default config.json: {e}")
+    except Exception:
+        pass
 
 if not config.get("connectionCode") or config["connectionCode"] == "YOUR_UNIQUE_CONNECTION_CODE" or config["connectionCode"].strip() == "":
     print(f"{colors['cyan']}[*] No connection code found.{colors['reset']}")
@@ -81,14 +79,10 @@ if not config.get("connectionCode") or config["connectionCode"] == "YOUR_UNIQUE_
         try:
             with open(config_path, "w") as f:
                 json.dump(config, f, indent=2)
-            print(f"{colors['green']}[+] Connection code saved to config.json!{colors['reset']}")
-        except Exception as e:
-            print(f"{colors['yellow']}[*] Could not save to config.json: {e} (will use code for this session){colors['reset']}")
+        except Exception:
+            pass
     except (EOFError, KeyboardInterrupt):
-        print(f"\n{colors['red']}[-] Cancelled. Exiting.{colors['reset']}")
         sys.exit(1)
-if not config.get("placeId") or config["placeId"] == 0:
-    print("[*] Warning: No 'placeId' configured yet. Waiting for PC dashboard to send it...")
 
 connection_code = config["connectionCode"]
 place_id = config["placeId"]
@@ -119,7 +113,6 @@ def get_device_id():
     return new_id
 
 device_id = get_device_id()
-print(f"[+] Device ID generated: {device_id}")
 
 discovery_topic = f"roblox/discovery/{connection_code}"
 status_topic = f"roblox/status/{connection_code}/{device_id}"
@@ -132,7 +125,7 @@ recent_logs = deque(maxlen=6)
 
 def draw_termux_ui():
     try:
-        sys.stdout.write("\033[H\033[2J\033[3J")
+        os.system("clear")
         sys.stdout.flush()
         
         status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
@@ -276,7 +269,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2017
+SCRIPT_VERSION = 2018
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -524,7 +517,10 @@ def update_targeted_packages(packages):
             log_states.pop(pkg, None)
     log_event(f"Targeted packages set ({len(packages)})")
 
-mqtt_client = mqtt.Client()
+try:
+    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+except Exception:
+    mqtt_client = mqtt.Client()
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
