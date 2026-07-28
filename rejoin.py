@@ -273,7 +273,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2015
+SCRIPT_VERSION = 2016
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -659,17 +659,18 @@ def on_message(client, userdata, msg):
         elif command == "update" or command == "self_update":
             log_event("Received remote UPDATE command. Fetching update...")
             try:
-                cache_buster_url = f"{RAW_GITHUB_URL}?t={int(time.time())}"
-                cmd = ["curl", "-sL", "--connect-timeout", "5", cache_buster_url]
+                cache_buster_url = f"{RAW_GITHUB_URL}?cb={int(time.time())}"
+                cmd = ["curl", "-H", "Cache-Control: no-cache, no-store", "-H", "Pragma: no-cache", "-sL", "--connect-timeout", "5", cache_buster_url]
                 remote_code = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8', errors='ignore')
-                version_match = re.search(r'SCRIPT_VERSION\s*=\s*(\d+)', remote_code)
-                if version_match:
+                if len(remote_code) > 100 and "SCRIPT_VERSION" in remote_code:
                     script_path = os.path.realpath(__file__)
                     with open(script_path, 'w', encoding='utf-8') as f:
                         f.write(remote_code)
                     log_event("Update applied! Restarting script...")
                     time.sleep(1)
                     os.execv(sys.executable, [sys.executable, script_path])
+                else:
+                    log_event("Remote update check: No valid code received.")
             except Exception as e:
                 log_event(f"Remote update failed: {e}")
 
