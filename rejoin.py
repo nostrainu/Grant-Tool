@@ -12,30 +12,7 @@ import urllib.request
 import ssl
 import sqlite3
 
-def inject_roblox_cookie(package_name, cookie_value):
-    if not cookie_value or not cookie_value.strip():
-        return False
-    cookie_value = cookie_value.strip()
-    temp_db = "/data/local/tmp/inject_cookies.db"
-    orig_db = f"/data/data/{package_name}/app_webview/Default/Cookies"
-    try:
-        res = subprocess.call(f"su -c 'cp {orig_db} {temp_db} && chmod 777 {temp_db}'", shell=True)
-        if res != 0 or not os.path.exists(temp_db):
-            return False
-        conn = sqlite3.connect(temp_db)
-        c = conn.cursor()
-        c.execute("DELETE FROM cookies WHERE name = '.ROBLOSECURITY';")
-        c.execute("""INSERT OR REPLACE INTO cookies 
-            (creation_utc, host_key, top_frame_site_key, name, value, path, expires_utc, is_secure, is_httponly, last_access_utc, has_expires, is_persistent, priority, samesite, source_scheme, source_port, is_same_party)
-            VALUES (13300000000000000, '.roblox.com', '', '.ROBLOSECURITY', ?, '/', 13600000000000000, 1, 1, 13300000000000000, 1, 1, 1, -1, 2, 443, 0);""", (cookie_value,))
-        conn.commit()
-        conn.close()
-        subprocess.call(f"su -c 'cp {temp_db} {orig_db} && chmod 660 {orig_db} && rm -f {temp_db}'", shell=True)
-        log_event(f"Injected .ROBLOSECURITY cookie for {package_name}")
-        return True
-    except Exception as e:
-        log_event(f"Cookie injection error for {package_name}: {e}")
-        return False
+
 
 colors = {
     "reset": "\033[0m",
@@ -491,97 +468,6 @@ def force_stop_roblox(package_name):
     running_states_cache[package_name] = False
     os.system("stty sane")
 
-def inject_roblox_cookie(package_name, cookie_value, username=""):
-    if not cookie_value:
-        return
-    cookie_val = cookie_value.strip()
-    if ".ROBLOSECURITY=" in cookie_val:
-        cookie_val = cookie_val.split(".ROBLOSECURITY=", 1)[1].strip()
-    if "ROBLOSECURITY=" in cookie_val:
-        cookie_val = cookie_val.split("ROBLOSECURITY=", 1)[1].strip()
-    cookie_val = cookie_val.split(";")[0].strip().strip('"').strip("'")
-
-    if not cookie_val:
-        return
-
-    log_event(f"Injecting .ROBLOSECURITY cookie for {package_name}...")
-    
-    force_stop_roblox(package_name)
-    time.sleep(1)
-
-    py_bin = sys.executable or "/data/data/com.termux/files/usr/bin/python3"
-
-    owner = ""
-    try:
-        owner = subprocess.check_output(f"su -c 'stat -c \"%u:%g\" /data/data/{package_name}' < /dev/null", shell=True).decode().strip()
-    except Exception:
-        pass
-
-    db_dirs = [
-        f"/data/data/{package_name}/app_webview/Default",
-        f"/data/data/{package_name}/app_webview",
-        f"/data/data/{package_name}/databases"
-    ]
-    for d in db_dirs:
-        os.system(f"su -c 'mkdir -p \"{d}\"' < /dev/null >/dev/null 2>&1")
-        os.system(f"su -c 'chmod 777 \"{d}\"' < /dev/null >/dev/null 2>&1")
-
-    db_paths = [
-        f"/data/data/{package_name}/app_webview/Default/Cookies",
-        f"/data/data/{package_name}/app_webview/Cookies",
-        f"/data/data/{package_name}/databases/WebView.db"
-    ]
-    
-    for db in db_paths:
-        try:
-            py_code = (
-                "import sqlite3, os; "
-                "db_p = '" + db + "'; "
-                "conn = sqlite3.connect(db_p); "
-                "cur = conn.cursor(); "
-                "cur.execute('CREATE TABLE IF NOT EXISTS cookies (creation_utc INTEGER NOT NULL, host_key TEXT NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, path TEXT NOT NULL, expires_utc INTEGER NOT NULL, is_secure INTEGER NOT NULL, is_httponly INTEGER NOT NULL, last_access_utc INTEGER NOT NULL, has_expires INTEGER NOT NULL DEFAULT 1, is_persistent INTEGER NOT NULL DEFAULT 1, priority INTEGER NOT NULL DEFAULT 1, samesite INTEGER NOT NULL DEFAULT -1, source_scheme INTEGER NOT NULL DEFAULT 2, source_port INTEGER NOT NULL DEFAULT 443, is_same_party INTEGER NOT NULL DEFAULT 0)'); "
-                "cur.execute('PRAGMA table_info(cookies)'); "
-                "cols = [r[1] for r in cur.fetchall()]; "
-                "cur.execute(\"DELETE FROM cookies WHERE name LIKE '%ROBLOSECURITY%' OR host_key LIKE '%roblox.com%'\"); "
-                "hosts = ['.roblox.com', 'roblox.com', 'www.roblox.com', '.www.roblox.com', 'web.roblox.com']; "
-                "names = ['.ROBLOSECURITY', 'ROBLOSECURITY']; "
-                "for h in hosts: "
-                "  for n in names: "
-                "    row = {'creation_utc': 13300000000000000, 'host_key': h, 'top_frame_site_key': '', 'name': n, 'value': '''" + cookie_val + "''', 'path': '/', 'expires_utc': 253402300799000000, 'is_secure': 1, 'is_httponly': 1, 'last_access_utc': 13300000000000000, 'has_expires': 1, 'is_persistent': 1, 'priority': 1, 'samesite': -1, 'source_scheme': 2, 'source_port': 443, 'is_same_party': 0, 'source_type': 0, 'has_cross_site_ancestor': 0}; "
-                "    p_cols = [c for c in cols if c in row]; "
-                "    sql = f\"INSERT INTO cookies ({', '.join(p_cols)}) VALUES ({', '.join(['?']*len(p_cols))})\"; "
-                "    cur.execute(sql, tuple(row[c] for c in p_cols)); "
-                "conn.commit(); conn.close(); "
-                "os.system('chmod 777 ' + db_p); "
-                "os.system('rm -f ' + db_p + '-wal ' + db_p + '-shm')"
-            )
-            cmd = f"su -c '{py_bin} -c \"{py_code}\"' < /dev/null >/dev/null 2>&1"
-            os.system(cmd)
-        except Exception:
-            pass
-
-    try:
-        app_storage_dir = f"/data/data/{package_name}/files/appData/LocalStorage"
-        app_storage_file = f"{app_storage_dir}/appStorage.json"
-        os.system(f"su -c 'mkdir -p \"{app_storage_dir}\"' < /dev/null >/dev/null 2>&1")
-        
-        storage_data = {"SecurityToken": cookie_val}
-        if username:
-            storage_data["Username"] = username
-            storage_data["Name"] = username
-            
-        json_str = json.dumps(storage_data).replace('"', '\\"')
-        os.system(f"su -c 'echo \"{json_str}\" > \"{app_storage_file}\"' < /dev/null >/dev/null 2>&1")
-        os.system(f"su -c 'chmod 777 \"{app_storage_file}\"' < /dev/null >/dev/null 2>&1")
-    except Exception:
-        pass
-
-    if owner:
-        os.system(f"su -c 'chown -R {owner} /data/data/{package_name}/app_webview' < /dev/null >/dev/null 2>&1")
-        os.system(f"su -c 'chown -R {owner} /data/data/{package_name}/files' < /dev/null >/dev/null 2>&1")
-        os.system(f"su -c 'chmod -R 777 /data/data/{package_name}/app_webview' < /dev/null >/dev/null 2>&1")
-        os.system(f"su -c 'chmod -R 777 /data/data/{package_name}/files' < /dev/null >/dev/null 2>&1")
-
 def launch_roblox(package_name):
     global client_overrides
     last_launch_time[package_name] = time.time()
@@ -590,19 +476,20 @@ def launch_roblox(package_name):
     pkg_link = private_server_link
     if 'client_overrides' in globals() and client_overrides and package_name in client_overrides:
         override = client_overrides[package_name]
-        cookie_val = override.get("cookie", "")
-        acc_user = override.get("username", "")
-        if cookie_val:
-            inject_roblox_cookie(package_name, cookie_val, acc_user)
         pkg_place_id = override.get("placeId", pkg_place_id)
         ps_list = override.get("privateServerList", [])
         if ps_list and len(ps_list) > 0:
             cur_idx = override.get("currentPSIndex", 0) or 0
             cur_idx = cur_idx % len(ps_list)
             pkg_link = ps_list[cur_idx]
-        else:
-            pkg_link = override.get("privateServerLink", pkg_link)
+        elif override.get("privateServerLink"):
+            pkg_link = override.get("privateServerLink")
 
+    log_event(f"Launching {package_name}...")
+    
+    force_stop_roblox(package_name)
+    time.sleep(1)
+    
     link = pkg_link.strip() if pkg_link else ""
     if link:
         url = link
