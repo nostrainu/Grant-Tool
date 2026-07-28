@@ -267,7 +267,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2008
+SCRIPT_VERSION = 2009
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -519,11 +519,13 @@ def on_connect(client, userdata, flags, rc):
     else:
         log_event(f"MQTT connection failed ({rc})")
 
+is_rejoining = False
 stop_requested = False
 
 def run_rejoin_sequence(payload):
-    global place_id, private_server_link, client_overrides, is_paused, stop_requested
+    global place_id, private_server_link, client_overrides, is_paused, is_rejoining, stop_requested
     is_paused = True
+    is_rejoining = True
     stop_requested = False
     log_event("Starting sequential rejoin...")
     
@@ -536,6 +538,7 @@ def run_rejoin_sequence(payload):
     
     for pkg in targeted_packages:
         if stop_requested:
+            is_rejoining = False
             log_event("Rejoin sequence canceled.")
             return
 
@@ -545,6 +548,7 @@ def run_rejoin_sequence(payload):
         
         for _ in range(2):
             if stop_requested:
+                is_rejoining = False
                 log_event("Rejoin sequence canceled.")
                 return
             time.sleep(1)
@@ -552,6 +556,7 @@ def run_rejoin_sequence(payload):
             send_status()
             
         if stop_requested:
+            is_rejoining = False
             log_event("Rejoin sequence canceled.")
             return
 
@@ -561,12 +566,14 @@ def run_rejoin_sequence(payload):
         
         for _ in range(10):
             if stop_requested:
+                is_rejoining = False
                 log_event("Rejoin sequence canceled.")
                 return
             time.sleep(1)
             update_running_states_cache()
             send_status()
         
+    is_rejoining = False
     if not stop_requested:
         is_paused = False
         now_finish = time.time()
@@ -682,6 +689,7 @@ def send_status():
         "installedClients": get_installed_roblox_packages(),
         "activeClients": targeted_packages,
         "isPaused": is_paused,
+        "isRejoining": is_rejoining,
         "clientOverrides": client_overrides
     }
     try:

@@ -563,9 +563,9 @@ async function main() {
 
                 let devTimerStr = "";
                 if (dev.state === "ONLINE") {
-                    if (dev.isPaused === true && !isRejoinerPaused) {
+                    if (dev.isRejoining === true) {
                         devTimerStr = ` ${colors.yellow}(Rejoining...)${colors.reset}`;
-                    } else if (!isRejoinerPaused) {
+                    } else if (dev.isPaused === false && !isRejoinerPaused) {
                         const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
                         let latestLaunchTs = dev.lastLaunchTime || 0;
                         
@@ -1079,6 +1079,7 @@ async function main() {
                     devices[deviceId].lastSeen = new Date();
                     devices[deviceId].state = "ONLINE";
                     devices[deviceId].isPaused = payload.isPaused;
+                    devices[deviceId].isRejoining = payload.isRejoining;
 
                     if (payload.lastLaunchTime && payload.lastLaunchTime > 0) {
                         devices[deviceId].lastLaunchTime = payload.lastLaunchTime;
