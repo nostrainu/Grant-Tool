@@ -188,10 +188,8 @@ ui_lock = threading.Lock()
 def draw_termux_ui():
     with ui_lock:
         try:
-            os.system("stty sane 2>/dev/null")
-            cpu_p = get_cpu_usage()
-            ram_used, ram_total, ram_pct = get_ram_usage()
-            ram_str = f"{ram_used:.2f}/{ram_total:.2f}G"
+            cpu_p, used_ram, total_ram = get_sys_stats()
+            ram_str = f"{used_ram:.2f}/{total_ram:.2f}G"
 
             status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
             status_color = colors['yellow'] if is_paused else colors['green']
@@ -278,7 +276,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2170
+SCRIPT_VERSION = 2180
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
