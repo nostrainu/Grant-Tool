@@ -334,7 +334,16 @@ def check_self_update():
     except Exception as e:
         log_event(f"Auto-update skipped: {e}")
 
-targeted_packages = config.get("targetedPackages", [])
+raw_tp = config.get("targetedPackages", [])
+installed_on_start = get_installed_roblox_packages()
+if raw_tp:
+    targeted_packages = [p for p in raw_tp if p in installed_on_start]
+    if not targeted_packages:
+        targeted_packages = installed_on_start
+else:
+    targeted_packages = installed_on_start
+config["targetedPackages"] = targeted_packages
+
 is_paused = config.get("isPaused", True)
 client_overrides = config.get("clientOverrides", {})
 
