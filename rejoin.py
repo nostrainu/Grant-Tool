@@ -328,7 +328,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2090
+SCRIPT_VERSION = 2100
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -495,11 +495,14 @@ def update_running_states_cache():
 
     for pkg in installed:
         is_running = False
-        if ps_out and pkg in ps_out:
+        pkg_short = pkg[:15]
+        pkg_suffix = pkg.split('.')[-1]
+        
+        if ps_out and (pkg in ps_out or pkg_short in ps_out or pkg_suffix in ps_out):
             is_running = True
         else:
             try:
-                out = subprocess.check_output(f"su -c 'pidof {pkg}' < /dev/null", shell=True).decode().strip()
+                out = subprocess.check_output(f"su -c 'pidof {pkg} || pidof {pkg_short}' < /dev/null", shell=True).decode().strip()
                 if out and any(p.isdigit() for p in out.split()):
                     is_running = True
             except Exception:

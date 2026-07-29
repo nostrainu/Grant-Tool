@@ -1914,7 +1914,7 @@ async function main() {
 
         deviceIds.forEach((id) => {
             const dev = devices[id];
-            if (dev.state === "ONLINE" && (now.getTime() - dev.lastSeen.getTime() > 45000)) {
+            if (dev.state === "ONLINE" && (now.getTime() - dev.lastSeen.getTime() > 90000)) {
                 dev.state = "OFFLINE";
                 changed = true;
             }
