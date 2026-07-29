@@ -255,14 +255,8 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
-        try:
-            import shutil
-            term_w = shutil.get_terminal_size((30, 20)).columns
-        except Exception:
-            term_w = 30
-
-        box_w = max(22, min(33, term_w - 2))
-        inner_w = box_w - 2
+        box_w = 21
+        inner_w = 19
 
         top_border = f"╔{'═' * inner_w}╗"
         mid_border = f"╠{'═' * inner_w}╣"
@@ -271,7 +265,7 @@ def draw_termux_ui():
         print("\033[H\033[2J", end="")
         print(f" {colors['cyan']}{top_border}{colors['reset']}")
         
-        cpu_ram_val = f"Cpu:{cpu_p}% │ Ram:{ram_str}"
+        cpu_ram_val = f"Cpu:{cpu_p}%│Ram:{ram_str.split('/')[0]}"
         if len(cpu_ram_val) > inner_w:
             cpu_ram_val = cpu_ram_val[:inner_w]
         print(f" {colors['cyan']}║{colors['reset']}{cpu_ram_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
@@ -288,7 +282,7 @@ def draw_termux_ui():
             stat_val = stat_val[:inner_w]
         print(f" {colors['cyan']}║{colors['reset']}{status_color}{stat_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
         
-        auto_val = f"Auto:{auto_text}"
+        auto_val = f"Auto:{auto_text.split(' ')[0]}"
         if len(auto_val) > inner_w:
             auto_val = auto_val[:inner_w]
         print(f" {colors['cyan']}║{colors['reset']}{auto_color}{auto_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
@@ -360,7 +354,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2140
+SCRIPT_VERSION = 2150
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():

@@ -46,6 +46,17 @@ let lastRejoinTime = null;
 let isRejoinerPaused = true;
 let lastActionNotice = "Dashboard ready.";
 
+function getDisplayName(pkg, userId) {
+    if (userId && userId !== "Unknown" && userId.toLowerCase() !== "null" && userId.toLowerCase() !== "none") {
+        return userId;
+    }
+    const lastChar = pkg ? pkg.slice(-1).toUpperCase() : "X";
+    if (pkg && pkg.toLowerCase().includes("noka")) {
+        return `Noka ${lastChar}`;
+    }
+    return `Client ${lastChar}`;
+}
+
 function updateMobileUpdateFile() {
     try {
         const rejoinPath = path.join(__dirname, 'rejoin.py');
