@@ -1075,9 +1075,21 @@ async function main() {
                         lastLog: payload.log || "Online",
                         lastLogTime: payload.logTime || null
                     };
-                } else {
+                    devices[deviceId].installedClients = payload.installedClients || devices[deviceId].installedClients || [];
                     if (savedTargets && (!configuringDevice || configuringDevice.deviceId !== deviceId)) {
-                        devices[deviceId].activeClients = [...savedTargets];
+                        const valid = savedTargets.filter(p => devices[deviceId].installedClients.includes(p));
+                        if (valid.length > 0) {
+                            devices[deviceId].activeClients = valid;
+                        } else {
+                            devices[deviceId].activeClients = [...devices[deviceId].installedClients];
+                            if (!config.deviceTargets) config.deviceTargets = {};
+                            config.deviceTargets[deviceId] = [...devices[deviceId].activeClients];
+                            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
+                        }
+                    } else if (payload.activeClients && payload.activeClients.length > 0) {
+                        devices[deviceId].activeClients = [...payload.activeClients];
+                    } else {
+                        devices[deviceId].activeClients = [...devices[deviceId].installedClients];
                     }
                     devices[deviceId].runningStates = payload.runningStates || {};
                     devices[deviceId].userIds = payload.userIds || {};
