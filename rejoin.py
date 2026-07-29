@@ -286,6 +286,8 @@ def draw_termux_ui():
             pad_l = (inner_w - len(title_str)) // 2
             pad_r = inner_w - len(title_str) - pad_l
             top_border = f"╔{'═' * pad_l}{colors['bold']}{colors['yellow']}{title_str}{colors['reset']}{colors['cyan']}{'═' * pad_r}╗"
+            mid_border = f"╠{'═' * inner_w}╣"
+            bot_border = f"╚{'═' * inner_w}╝"
 
             print("\033[H\033[2J\r", end="", flush=True)
             print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
@@ -349,7 +351,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 3000
+SCRIPT_VERSION = 3100
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
