@@ -507,6 +507,9 @@ def force_stop_roblox(package_name):
     os.system("stty sane")
 
 def launch_roblox(package_name):
+    installed = get_installed_roblox_packages()
+    if package_name not in installed:
+        return
     global client_overrides
     last_launch_time[package_name] = time.time()
     
