@@ -279,8 +279,8 @@ def draw_termux_ui():
                 auto_text = "PAUSED"
                 auto_color = colors['yellow']
 
-            box_w = 21
-            inner_w = 19
+            box_w = 35
+            inner_w = 33
 
             top_border = f"╔{'═' * inner_w}╗"
             mid_border = f"╠{'═' * inner_w}╣"
@@ -289,27 +289,19 @@ def draw_termux_ui():
             print("\033[H\033[2J\r", end="", flush=True)
             print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
             
-            cpu_ram_val = f"Cpu:{cpu_p}%│Ram:{ram_str.split('/')[0]}"
-            if len(cpu_ram_val) > inner_w:
-                cpu_ram_val = cpu_ram_val[:inner_w]
-            print(f"\r {colors['cyan']}║{colors['reset']}{cpu_ram_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
+            cpu_ram_val = f" Cpu:{cpu_p:<4}%│Ram:{ram_str:<18}"
+            print(f"\r {colors['cyan']}║{colors['reset']}{cpu_ram_val}{colors['cyan']}║{colors['reset']}")
             
             print(f"\r {colors['cyan']}{mid_border}{colors['reset']}")
             
-            dev_val = f"Dev:{device_id.replace('device_', '')}"
-            if len(dev_val) > inner_w:
-                dev_val = dev_val[:inner_w]
-            print(f"\r {colors['cyan']}║{colors['reset']}{dev_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
+            dev_val = f" Device ID:   {device_id:<19}"
+            print(f"\r {colors['cyan']}║{colors['reset']}{dev_val}{colors['cyan']}║{colors['reset']}")
             
-            stat_val = f"State:{status_text}"
-            if len(stat_val) > inner_w:
-                stat_val = stat_val[:inner_w]
-            print(f"\r {colors['cyan']}║{colors['reset']}{status_color}{stat_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+            stat_val = f" Status:      {status_color}{status_text:<19}{colors['reset']}"
+            print(f"\r {colors['cyan']}║{colors['reset']}{stat_val}{colors['cyan']}║{colors['reset']}")
             
-            auto_val = f"Auto:{auto_text}"
-            if len(auto_val) > inner_w:
-                auto_val = auto_val[:inner_w]
-            print(f"\r {colors['cyan']}║{colors['reset']}{auto_color}{auto_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+            auto_val = f" Auto-Rejoin: {auto_color}{auto_text:<19}{colors['reset']}"
+            print(f"\r {colors['cyan']}║{colors['reset']}{auto_val}{colors['cyan']}║{colors['reset']}")
             
             print(f"\r {colors['cyan']}{bot_border}{colors['reset']}\n")
 
@@ -356,7 +348,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2200
+SCRIPT_VERSION = 2210
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
