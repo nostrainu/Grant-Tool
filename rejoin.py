@@ -99,16 +99,29 @@ def protect_process(package_name):
         pass
 
 def get_roblox_username_or_id(package_name):
-    db_path = f"/data/data/{package_name}/databases/ROBLOX.db"
-    try:
-        cmd = f"su -c 'cat {db_path}'"
-        data = subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL)
-        if data:
-            match = re.search(b'([a-zA-Z0-9_]{3,20})\x00.*(?:username|name)', data, re.IGNORECASE)
-            if match:
-                return match.group(1).decode('utf-8', errors='ignore')
-    except Exception:
-        pass
+    db_paths = [
+        f"/data/data/{package_name}/databases/ROBLOX.db",
+        f"/data/data/{package_name}/shared_prefs/com.roblox.client.xml",
+        f"/data/data/{package_name}/files/user.config"
+    ]
+    for db_path in db_paths:
+        try:
+            cmd = f"su -c 'cat {db_path}'"
+            data = subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL)
+            if data:
+                match = re.search(b'([a-zA-Z0-9_]{3,20})\x00.*(?:username|name)', data, re.IGNORECASE)
+                if not match:
+                    match = re.search(b'"username":\s*"([a-zA-Z0-9_]{3,20})"', data, re.IGNORECASE)
+                if not match:
+                    match = re.search(b'<string name="username">([a-zA-Z0-9_]{3,20})</string>', data, re.IGNORECASE)
+                if not match:
+                    match = re.search(b'"name":\s*"([a-zA-Z0-9_]{3,20})"', data, re.IGNORECASE)
+                if match:
+                    uname = match.group(1).decode('utf-8', errors='ignore')
+                    if uname and uname.lower() not in ["null", "none", "unknown", "roblox"]:
+                        return uname
+        except Exception:
+            pass
     return None
 
 colors = {
@@ -351,7 +364,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 3100
+SCRIPT_VERSION = 3200
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():

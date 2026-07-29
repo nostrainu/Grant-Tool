@@ -50,10 +50,14 @@ function getDisplayName(pkg, userId) {
     if (userId && userId !== "Unknown" && userId.toLowerCase() !== "null" && userId.toLowerCase() !== "none") {
         return userId;
     }
-    const lastChar = pkg ? pkg.slice(-1).toUpperCase() : "X";
-    if (pkg && pkg.toLowerCase().includes("noka")) {
-        return `Noka ${lastChar}`;
+    if (pkg) {
+        const parts = pkg.split('.');
+        const shortName = parts[parts.length - 1];
+        if (shortName && shortName !== "roblox") {
+            return shortName;
+        }
     }
+    const lastChar = pkg ? pkg.slice(-1).toUpperCase() : "X";
     return `Client ${lastChar}`;
 }
 
