@@ -46,21 +46,6 @@ let lastRejoinTime = null;
 let isRejoinerPaused = true;
 let lastActionNotice = "Dashboard ready.";
 
-function getDisplayName(pkg, userId) {
-    if (userId && userId !== "Unknown" && userId.toLowerCase() !== "null" && userId.toLowerCase() !== "none") {
-        return userId;
-    }
-    if (pkg) {
-        const parts = pkg.split('.');
-        const shortName = parts[parts.length - 1];
-        if (shortName && shortName !== "roblox") {
-            return shortName;
-        }
-    }
-    const lastChar = pkg ? pkg.slice(-1).toUpperCase() : "X";
-    return `Client ${lastChar}`;
-}
-
 function updateMobileUpdateFile() {
     try {
         const rejoinPath = path.join(__dirname, 'rejoin.py');
@@ -150,7 +135,7 @@ function loadConfig() {
             console.log(" [*] Warning: config.json was corrupted or invalid. Resetting to default configuration...");
         }
     }
-
+    
     if (!loadedSuccess) {
         config = {
             connectionCode: "YOUR_UNIQUE_CONNECTION_CODE",
@@ -164,9 +149,9 @@ function loadConfig() {
         };
         try {
             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-        } catch (e) { }
+        } catch (e) {}
     }
-
+    
     if (config.autoRejoinIntervalMinutes === undefined) config.autoRejoinIntervalMinutes = 0;
     if (config.clientOverrides === undefined) config.clientOverrides = {};
     if (config.deviceTargets === undefined) config.deviceTargets = {};
@@ -577,7 +562,7 @@ async function main() {
         }
 
         printInnerLine(`${colors.gray}${"─".repeat(innerWidth - 4)}${colors.reset}`);
-
+        
         const totalPages = Math.ceil(deviceIds.length / 4) || 1;
         if (currentDevicePage >= totalPages) currentDevicePage = 0;
 
@@ -598,7 +583,7 @@ async function main() {
                     } else if (dev.isPaused === false) {
                         const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
                         let latestLaunchTs = dev.lastLaunchTime || 0;
-
+                        
                         const devObj = (config.clientOverrides && config.clientOverrides[id]) || {};
                         Object.keys(devObj).forEach(pKey => {
                             const cObj = devObj[pKey];
@@ -612,7 +597,7 @@ async function main() {
                                 if (cTs > latestLaunchTs) latestLaunchTs = cTs;
                             }
                         });
-
+                        
                         if (devIntervalMins > 0 && latestLaunchTs > 0) {
                             const elapsedSecs = Math.max(0, Math.floor(now.getTime() / 1000 - latestLaunchTs));
                             const remainingSecs = Math.max(0, (devIntervalMins * 60) - elapsedSecs);
@@ -1090,21 +1075,9 @@ async function main() {
                         lastLog: payload.log || "Online",
                         lastLogTime: payload.logTime || null
                     };
-                    devices[deviceId].installedClients = payload.installedClients || devices[deviceId].installedClients || [];
+                } else {
                     if (savedTargets && (!configuringDevice || configuringDevice.deviceId !== deviceId)) {
-                        const valid = savedTargets.filter(p => devices[deviceId].installedClients.includes(p));
-                        if (valid.length > 0) {
-                            devices[deviceId].activeClients = valid;
-                        } else {
-                            devices[deviceId].activeClients = [...devices[deviceId].installedClients];
-                            if (!config.deviceTargets) config.deviceTargets = {};
-                            config.deviceTargets[deviceId] = [...devices[deviceId].activeClients];
-                            try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) { }
-                        }
-                    } else if (payload.activeClients && payload.activeClients.length > 0) {
-                        devices[deviceId].activeClients = [...payload.activeClients];
-                    } else {
-                        devices[deviceId].activeClients = [...devices[deviceId].installedClients];
+                        devices[deviceId].activeClients = [...savedTargets];
                     }
                     devices[deviceId].runningStates = payload.runningStates || {};
                     devices[deviceId].userIds = payload.userIds || {};
@@ -1159,17 +1132,13 @@ async function main() {
 
 
                         if (!match) {
-                            const installed = devices[deviceId].installedClients || [];
-                            const validPcList = pcList.filter(p => installed.includes(p));
-                            if (validPcList.length > 0 && validPcList.length === pcList.length) {
-                                const nowMs = new Date().getTime();
-                                if (!devices[deviceId].lastSyncTime || nowMs - devices[deviceId].lastSyncTime > 10000) {
-                                    devices[deviceId].lastSyncTime = nowMs;
-                                    client.publish(`${controlDevicePrefix}${deviceId}`, JSON.stringify({
-                                        command: "update_packages",
-                                        packageNames: pcList
-                                    }));
-                                }
+                            const nowMs = new Date().getTime();
+                            if (!devices[deviceId].lastSyncTime || nowMs - devices[deviceId].lastSyncTime > 10000) {
+                                devices[deviceId].lastSyncTime = nowMs;
+                                client.publish(`${controlDevicePrefix}${deviceId}`, JSON.stringify({
+                                    command: "update_packages",
+                                    packageNames: pcList
+                                }));
                             }
                         }
                     }
@@ -1272,10 +1241,10 @@ async function main() {
             } else {
                 console.log(`  ${colors.bold}Total RAM Accounts Detected:${colors.reset} ${accs.length}\n`);
                 accs.forEach((acc, i) => {
-                    const name = acc.Username || acc.Name || acc.username || `Account #${i + 1}`;
+                    const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
                     const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
                     const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
-                    console.log(`   [${i + 1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
+                    console.log(`   [${i+1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
                 });
             }
         } else {
@@ -1388,7 +1357,7 @@ async function main() {
                     const acc = accs[assignedCount];
                     const cookie = acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY || "";
                     const username = acc.Username || acc.Name || acc.username || "";
-
+                    
                     if (!config.clientOverrides[dev.deviceId][pkg]) config.clientOverrides[dev.deviceId][pkg] = {};
                     if (cookie) config.clientOverrides[dev.deviceId][pkg].cookie = cookie;
                     if (username) config.clientOverrides[dev.deviceId][pkg].username = username;
@@ -1419,7 +1388,7 @@ async function main() {
 
         console.log(`\n ${colors.cyan}╔══════ SELECT RAM ACCOUNT TO LOGIN ═══════════════════════════════════════╗${colors.reset}\n`);
         accs.forEach((acc, i) => {
-            const name = acc.Username || acc.Name || acc.username || `Account #${i + 1}`;
+            const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
             const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
             const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
             const idxStr = `[${colors.bold}${colors.green}${String(i + 1).padStart(2, ' ')}${colors.reset}]`;
@@ -1466,7 +1435,7 @@ async function main() {
             clients.forEach(pkg => {
                 const pkgClean = pkg.replace('com.roblox.', '').replace('client', 'Client ');
                 const pkgSlot = pkgClean.charAt(0).toUpperCase() + pkgClean.slice(1);
-
+                
                 let activeUser = (dev.userIds && dev.userIds[pkg]) ? dev.userIds[pkg] : "";
                 if (!activeUser || activeUser === "Unknown") {
                     activeUser = "Empty";
@@ -1929,7 +1898,7 @@ async function main() {
 
         deviceIds.forEach((id) => {
             const dev = devices[id];
-            if (dev.state === "ONLINE" && (now.getTime() - dev.lastSeen.getTime() > 90000)) {
+            if (dev.state === "ONLINE" && (now.getTime() - dev.lastSeen.getTime() > 45000)) {
                 dev.state = "OFFLINE";
                 changed = true;
             }
@@ -2012,3 +1981,4 @@ async function main() {
 main().catch(err => {
     console.error("[-] Execution error:", err);
 });
+

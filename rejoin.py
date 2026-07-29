@@ -8,121 +8,10 @@ import paho.mqtt.client as mqtt
 import threading
 import re
 import urllib.request
+import ssl
 import sqlite3
 
-def get_installed_roblox_packages():
-    packages = set()
-    cmds = [
-        "pm list packages -3",
-        "pm list packages",
-        "su -c 'pm list packages -3' < /dev/null",
-        "su -c 'pm list packages' < /dev/null"
-    ]
-    for cmd in cmds:
-        try:
-            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
-            for line in out.splitlines():
-                line_str = line.strip()
-                if line_str.startswith("package:"):
-                    pkg = line_str.replace("package:", "").strip()
-                    pkg_lower = pkg.lower()
-                    if any(k in pkg_lower for k in ["roblox", "clien", "noka", "free"]):
-                        packages.add(pkg)
-        except Exception:
-            pass
-    return sorted(list(packages))
 
-running_states_cache = {}
-user_ids_cache = {}
-last_launch_time = {}
-
-def update_running_states_cache():
-    global running_states_cache
-    ps_out = ""
-    for cmd in ["su -c 'ps -ef || ps -A || ps'", "ps -ef", "ps -A", "ps"]:
-        try:
-            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
-            if out and len(out.strip()) > 0:
-                ps_out += "\n" + out
-        except Exception:
-            pass
-    
-    new_cache = {}
-    for pkg in get_installed_roblox_packages():
-        pkg_short = pkg[:15]
-        pkg_suffix = pkg.split('.')[-1]
-        is_run = (pkg in ps_out) or (pkg_short in ps_out) or (pkg_suffix in ps_out)
-        new_cache[pkg] = is_run
-    running_states_cache = new_cache
-
-def check_roblox_running(package_name):
-    return running_states_cache.get(package_name, False)
-
-def force_stop_roblox(package_name):
-    cmds = [
-        f"am force-stop {package_name}",
-        f"su -c 'am force-stop {package_name}'",
-        f"su -c 'pkill -9 -f {package_name}'"
-    ]
-    for cmd in cmds:
-        try:
-            os.system(f"{cmd} </dev/null >/dev/null 2>&1")
-        except Exception:
-            pass
-
-def launch_roblox(package_name):
-    force_stop_roblox(package_name)
-    time.sleep(2)
-    ps_url = config.get("privateServerLink", "")
-    place_id_val = config.get("placeId", 0)
-    
-    override = client_overrides.get(package_name, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
-    if isinstance(override, dict) and override.get("privateServerList"):
-        ps_list = override.get("privateServerList", [])
-        if len(ps_list) > 0:
-            idx = override.get("currentPSIndex", 0) or 0
-            ps_url = ps_list[idx % len(ps_list)]
-
-    if ps_url and "privateServerLinkCode=" in ps_url:
-        cmd = f"am start -n {package_name}/com.roblox.client.Activity -a android.intent.action.VIEW -d \"{ps_url}\""
-    else:
-        cmd = f"am start -n {package_name}/com.roblox.client.Activity -a android.intent.action.VIEW -d \"roblox://placeID={place_id_val}\""
-    
-    os.system(f"{cmd} </dev/null >/dev/null 2>&1")
-    os.system(f"su -c '{cmd}' </dev/null >/dev/null 2>&1")
-    last_launch_time[package_name] = time.time()
-
-def protect_process(package_name):
-    try:
-        os.system(f"su -c 'for p in $(pgrep -f {package_name}); do echo -1000 > /proc/$p/oom_score_adj; done' </dev/null >/dev/null 2>&1")
-    except Exception:
-        pass
-
-def get_roblox_username_or_id(package_name):
-    db_paths = [
-        f"/data/data/{package_name}/databases/ROBLOX.db",
-        f"/data/data/{package_name}/shared_prefs/com.roblox.client.xml",
-        f"/data/data/{package_name}/files/user.config"
-    ]
-    for db_path in db_paths:
-        try:
-            cmd = f"su -c 'cat {db_path}'"
-            data = subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL)
-            if data:
-                match = re.search(b'([a-zA-Z0-9_]{3,20})\x00.*(?:username|name)', data, re.IGNORECASE)
-                if not match:
-                    match = re.search(b'"username":\s*"([a-zA-Z0-9_]{3,20})"', data, re.IGNORECASE)
-                if not match:
-                    match = re.search(b'<string name="username">([a-zA-Z0-9_]{3,20})</string>', data, re.IGNORECASE)
-                if not match:
-                    match = re.search(b'"name":\s*"([a-zA-Z0-9_]{3,20})"', data, re.IGNORECASE)
-                if match:
-                    uname = match.group(1).decode('utf-8', errors='ignore')
-                    if uname and uname.lower() not in ["null", "none", "unknown", "roblox"]:
-                        return uname
-        except Exception:
-            pass
-    return None
 
 colors = {
     "reset": "\033[0m",
@@ -275,86 +164,142 @@ def get_sys_stats():
 
     return round(cpu_pct, 1), round(used_gb, 2), round(total_gb, 2)
 
-ui_lock = threading.Lock()
-
 def draw_termux_ui():
-    with ui_lock:
-        try:
-            cpu_p, used_ram, total_ram = get_sys_stats()
-            ram_str = f"{used_ram:.2f}/{total_ram:.2f}G"
+    try:
+        sys.stdout.write("\033[H\033[2J\033[3J")
+        sys.stdout.flush()
+        
+        cpu_p, used_ram, total_ram = get_sys_stats()
+        ram_str = f"{used_ram:.2f}/{total_ram:.2f}G"
 
-            status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
-            status_color = colors['yellow'] if is_paused else colors['green']
-
-            auto_text = "Disabled"
-            auto_color = colors['gray']
-            if is_paused:
-                auto_text = "PAUSED"
-                auto_color = colors['yellow']
-
-            box_w = 35
-            inner_w = 33
-
-            title_str = " GRANT MOBILE "
-            pad_l = (inner_w - len(title_str)) // 2
-            pad_r = inner_w - len(title_str) - pad_l
-            top_border = f"╔{'═' * pad_l}{colors['bold']}{colors['yellow']}{title_str}{colors['reset']}{colors['cyan']}{'═' * pad_r}╗"
-            mid_border = f"╠{'═' * inner_w}╣"
-            bot_border = f"╚{'═' * inner_w}╝"
-
-            print("\033[H\033[2J\r", end="", flush=True)
-            print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
+        status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
+        status_color = colors['yellow'] if is_paused else colors['green']
+        
+        auto_text = ""
+        auto_color = colors['gray']
+        if is_paused:
+            auto_text = "PAUSED"
+            auto_color = colors['yellow']
+        else:
+            now_ts = time.time()
+            min_rem = None
+            active_interval = None
             
-            cpu_ram_val = f" Cpu:{cpu_p:<4}%│Ram:{ram_str:<18}"
-            print(f"\r {colors['cyan']}║{colors['reset']}{cpu_ram_val}{colors['cyan']}║{colors['reset']}")
-            
-            print(f"\r {colors['cyan']}{mid_border}{colors['reset']}")
-            
-            dev_val = f" Device ID:   {device_id:<19}"
-            print(f"\r {colors['cyan']}║{colors['reset']}{dev_val}{colors['cyan']}║{colors['reset']}")
-            
-            stat_val = f" Status:      {status_color}{status_text:<19}{colors['reset']}"
-            print(f"\r {colors['cyan']}║{colors['reset']}{stat_val}{colors['cyan']}║{colors['reset']}")
-            
-            auto_val = f" Auto-Rejoin: {auto_color}{auto_text:<19}{colors['reset']}"
-            print(f"\r {colors['cyan']}║{colors['reset']}{auto_val}{colors['cyan']}║{colors['reset']}")
-            
-            print(f"\r {colors['cyan']}{bot_border}{colors['reset']}\n")
+            for pkg in targeted_packages:
+                ov = client_overrides.get(pkg, {}) if isinstance(client_overrides, dict) else {}
+                interval_sec = None
+                if isinstance(ov, dict):
+                    interval_sec = ov.get("cycleIntervalSeconds")
+                    if not interval_sec and ov.get("cycleIntervalMinutes"):
+                        interval_sec = int(ov.get("cycleIntervalMinutes") * 60)
+                if not interval_sec:
+                    auto_min = config.get("autoRejoinIntervalMinutes", 0)
+                    if auto_min and auto_min > 0:
+                        interval_sec = int(auto_min * 60)
+                
+                if interval_sec and interval_sec > 0:
+                    last_c = ov.get("lastCycleTime", 0) if isinstance(ov, dict) else 0
+                    last_c_ts = 0
+                    if isinstance(last_c, (int, float)):
+                        last_c_ts = last_c
+                    elif isinstance(last_c, str):
+                        try:
+                            if last_c.replace('.', '', 1).isdigit():
+                                last_c_ts = float(last_c)
+                            else:
+                                import datetime
+                                dt = datetime.datetime.fromisoformat(last_c.replace('Z', '+00:00'))
+                                last_c_ts = dt.timestamp()
+                        except Exception:
+                            last_c_ts = 0
 
-            installed = get_installed_roblox_packages()
-            if installed:
-                max_name_len = 10
-                for p in installed:
-                    u = user_ids_cache.get(p, "Unknown")
-                    d = u if u and u != "Unknown" else p
-                    if len(d) > max_name_len:
-                        max_name_len = len(d)
-                name_w = max_name_len + 1
+                    if last_c_ts > 0:
+                        rem = max(0, interval_sec - int(now_ts - last_c_ts))
+                        if min_rem is None or rem < min_rem:
+                            min_rem = rem
+                            active_interval = interval_sec
+                    else:
+                        min_rem = 0
+                        active_interval = interval_sec
 
-                for pkg in installed:
-                    is_run = check_roblox_running(pkg)
-                    is_target = pkg in targeted_packages
-                    uid = user_ids_cache.get(pkg, "Unknown")
-                    status_str = f"{colors['green']}[RUNNING]{colors['reset']}" if is_run else f"{colors['red']}[STOPPED]{colors['reset']}"
-                    target_str = f"[{colors['green']}X{colors['reset']}]" if is_target else "[ ]"
-                    disp_name = uid if uid and uid != "Unknown" else pkg
-                    pkg_short = pkg.split('.')[-1]
-                    disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
-                    pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
-                    print(f"\r   {target_str} {disp_padded} {pkg_formatted} - {status_str}")
+            if min_rem is not None and active_interval:
+                m_label = f"{int(active_interval / 60)}m" if active_interval % 60 == 0 else f"{active_interval / 60:.1f}m"
+                if min_rem < 60:
+                    rem_str = f"{min_rem}s"
+                else:
+                    r_m = min_rem // 60
+                    r_s = min_rem % 60
+                    rem_str = f"{r_m}:{r_s:02d}"
+                auto_text = f"{m_label} (Next: {rem_str})"
+                auto_color = colors['green']
             else:
-                print(f"\r   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
+                auto_text = "Disabled"
+                auto_color = colors['gray']
 
-            print(f"\r\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
-            if recent_logs:
-                for item in recent_logs:
-                    clean_item = item if len(item) <= 42 else item[:39] + "..."
-                    print(f"\r   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
-            else:
-                print(f"\r   {colors['gray']}No logs yet.{colors['reset']}\n")
-            sys.stdout.flush()
-        except Exception:
-            pass
+        print(f" {colors['cyan']}╔═════════════════════════════════╗{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Cpu:{colors['reset']}{cpu_p:<5}%│{colors['bold']}Ram:{colors['reset']}{ram_str:<17}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}╠═════════════════════════════════╣{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<19}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Auto-Rejoin:{colors['reset']} {auto_color}{auto_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}╚═════════════════════════════════╝{colors['reset']}\n")
+
+        installed = get_installed_roblox_packages()
+        if installed:
+            max_name_len = 10
+            for p in installed:
+                u = user_ids_cache.get(p, "Unknown")
+                d = u if u and u != "Unknown" else p
+                if len(d) > max_name_len:
+                    max_name_len = len(d)
+            name_w = max_name_len + 1
+
+            for pkg in installed:
+                is_run = check_roblox_running(pkg)
+                is_target = pkg in targeted_packages
+                uid = user_ids_cache.get(pkg, "Unknown")
+                status_str = f"{colors['green']}[RUNNING]{colors['reset']}" if is_run else f"{colors['red']}[STOPPED]{colors['reset']}"
+                target_str = f"[{colors['green']}X{colors['reset']}]" if is_target else "[ ]"
+                disp_name = uid if uid and uid != "Unknown" else pkg
+                pkg_short = pkg.split('.')[-1]
+                
+                cycle_tag_fmt = ""
+                override = client_overrides.get(pkg, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
+                if isinstance(override, dict) and override.get("privateServerList"):
+                    ps_list = override.get("privateServerList", [])
+                    if len(ps_list) > 0:
+                        idx = (override.get("currentPSIndex", 0) or 0) + 1
+                        total = len(ps_list)
+                        interval_sec = override.get("cycleIntervalSeconds")
+                        if not interval_sec and override.get("cycleIntervalMinutes"):
+                            interval_sec = int(override.get("cycleIntervalMinutes") * 60)
+                        
+                        if interval_sec:
+                            if interval_sec < 60:
+                                t_str = f"{interval_sec}s"
+                            else:
+                                m = interval_sec / 60
+                                t_str = f"{int(m)}m" if m.is_integer() else f"{m:.1f}m"
+                            cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total} | {t_str}]{colors['reset']}"
+                        else:
+                            cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
+                            
+                disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
+                pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
+                
+                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
+        else:
+            print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
+
+        print(f"\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
+        if recent_logs:
+            for item in recent_logs:
+                clean_item = item if len(item) <= 42 else item[:39] + "..."
+                print(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
+        else:
+            print(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
+    except Exception:
+        pass
 
 def log_event(msg):
     global last_logged_event, last_log_time
@@ -364,7 +309,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 3200
+SCRIPT_VERSION = 2050
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -388,6 +333,28 @@ def check_self_update():
         log_event("rejoin.py is up to date.")
     except Exception as e:
         log_event(f"Auto-update skipped: {e}")
+
+def get_installed_roblox_packages():
+    packages = set()
+    cmds = [
+        "pm list packages -3",
+        "pm list packages",
+        "su -c 'pm list packages -3' < /dev/null",
+        "su -c 'pm list packages' < /dev/null"
+    ]
+    for cmd in cmds:
+        try:
+            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
+            for line in out.splitlines():
+                line_str = line.strip()
+                if line_str.startswith("package:"):
+                    pkg = line_str.replace("package:", "").strip()
+                    pkg_lower = pkg.lower()
+                    if any(k in pkg_lower for k in ["roblox", "clien", "noka", "free"]):
+                        packages.add(pkg)
+        except Exception:
+            pass
+    return sorted(list(packages))
 
 raw_tp = config.get("targetedPackages", [])
 installed_on_start = get_installed_roblox_packages()
@@ -494,28 +461,28 @@ def protect_process(package_name):
     except Exception:
         pass
 
+
+
 def get_roblox_username_or_id(package_name):
-    paths = [
-        f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json",
-        f"/data/data/{package_name}/shared_prefs/appStorage.json"
-    ]
-    for app_storage_path in paths:
-        try:
-            cmd = f"su -c 'cat \"{app_storage_path}\" 2>/dev/null' < /dev/null"
-            content = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
-            if content:
-                m = re.search(r'\\?"Username\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
-                if not m:
-                    m = re.search(r'\\?"Name\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
-                if m and m.group(1).lower() not in ["null", "none", "unknown"]:
-                    return m.group(1)
-        except Exception:
-            pass
+    app_storage_path = f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json"
+    try:
+        cmd = f"su -c 'cat \"{app_storage_path}\" 2>/dev/null' < /dev/null"
+        content = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
+        if content:
+            m = re.search(r'\\?"Username\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
+            if not m:
+                m = re.search(r'\\?"Name\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
+            if m and m.group(1).lower() not in ["null", "none", "unknown"]:
+                return m.group(1)
+    except Exception:
+        pass
 
     last_char = package_name[-1].upper() if package_name else "X"
     if "noka" in package_name.lower():
         return f"Noka {last_char}"
     return f"Client {last_char}"
+
+
 
 def check_roblox_running(package_name):
     return running_states_cache.get(package_name, False)
@@ -524,21 +491,17 @@ def update_running_states_cache():
     global running_states_cache
     installed = get_installed_roblox_packages()
     running = {}
-    try:
-        ps_out = subprocess.check_output("su -c 'ps -ef || ps -A || ps' 2>/dev/null", shell=True).decode('utf-8', errors='ignore')
-    except Exception:
-        ps_out = ""
-
     for pkg in installed:
         is_running = False
-        pkg_short = pkg[:15]
-        pkg_suffix = pkg.split('.')[-1]
-        
-        if ps_out and (pkg in ps_out or pkg_short in ps_out or pkg_suffix in ps_out):
-            is_running = True
-        else:
+        try:
+            out = subprocess.check_output(f"su -c 'pidof {pkg}' < /dev/null", shell=True).decode().strip()
+            if out and any(p.isdigit() for p in out.split()):
+                is_running = True
+        except Exception:
+            pass
+        if not is_running:
             try:
-                out = subprocess.check_output(f"su -c 'pidof {pkg} || pidof {pkg_short}' < /dev/null", shell=True).decode().strip()
+                out = subprocess.check_output(f"pidof {pkg} 2>/dev/null", shell=True).decode().strip()
                 if out and any(p.isdigit() for p in out.split()):
                     is_running = True
             except Exception:
