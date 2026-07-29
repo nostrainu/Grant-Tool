@@ -328,7 +328,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2080
+SCRIPT_VERSION = 2090
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -489,7 +489,7 @@ def update_running_states_cache():
     installed = get_installed_roblox_packages()
     running = {}
     try:
-        ps_out = subprocess.check_output("ps -A 2>/dev/null || ps 2>/dev/null", shell=True).decode('utf-8', errors='ignore')
+        ps_out = subprocess.check_output("su -c 'ps -ef || ps -A || ps' 2>/dev/null", shell=True).decode('utf-8', errors='ignore')
     except Exception:
         ps_out = ""
 
@@ -499,7 +499,7 @@ def update_running_states_cache():
             is_running = True
         else:
             try:
-                out = subprocess.check_output(f"pidof {pkg} 2>/dev/null", shell=True).decode().strip()
+                out = subprocess.check_output(f"su -c 'pidof {pkg}' < /dev/null", shell=True).decode().strip()
                 if out and any(p.isdigit() for p in out.split()):
                     is_running = True
             except Exception:
