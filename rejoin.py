@@ -328,7 +328,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2070
+SCRIPT_VERSION = 2080
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -459,18 +459,22 @@ def protect_process(package_name):
         pass
 
 def get_roblox_username_or_id(package_name):
-    app_storage_path = f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json"
-    try:
-        cmd = f"su -c 'cat \"{app_storage_path}\" 2>/dev/null' < /dev/null"
-        content = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
-        if content:
-            m = re.search(r'\\?"Username\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
-            if not m:
-                m = re.search(r'\\?"Name\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
-            if m and m.group(1).lower() not in ["null", "none", "unknown"]:
-                return m.group(1)
-    except Exception:
-        pass
+    paths = [
+        f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json",
+        f"/data/data/{package_name}/shared_prefs/appStorage.json"
+    ]
+    for app_storage_path in paths:
+        try:
+            cmd = f"su -c 'cat \"{app_storage_path}\" 2>/dev/null' < /dev/null"
+            content = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
+            if content:
+                m = re.search(r'\\?"Username\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
+                if not m:
+                    m = re.search(r'\\?"Name\\?":\s*\\?"([A-Za-z0-9_]{3,20})\\?"', content)
+                if m and m.group(1).lower() not in ["null", "none", "unknown"]:
+                    return m.group(1)
+        except Exception:
+            pass
 
     last_char = package_name[-1].upper() if package_name else "X"
     if "noka" in package_name.lower():
@@ -484,15 +488,16 @@ def update_running_states_cache():
     global running_states_cache
     installed = get_installed_roblox_packages()
     running = {}
+    try:
+        ps_out = subprocess.check_output("ps -A 2>/dev/null || ps 2>/dev/null", shell=True).decode('utf-8', errors='ignore')
+    except Exception:
+        ps_out = ""
+
     for pkg in installed:
         is_running = False
-        try:
-            out = subprocess.check_output(f"su -c 'pidof {pkg}' < /dev/null", shell=True).decode().strip()
-            if out and any(p.isdigit() for p in out.split()):
-                is_running = True
-        except Exception:
-            pass
-        if not is_running:
+        if ps_out and pkg in ps_out:
+            is_running = True
+        else:
             try:
                 out = subprocess.check_output(f"pidof {pkg} 2>/dev/null", shell=True).decode().strip()
                 if out and any(p.isdigit() for p in out.split()):

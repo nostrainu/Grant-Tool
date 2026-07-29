@@ -1144,13 +1144,17 @@ async function main() {
 
 
                         if (!match) {
-                            const nowMs = new Date().getTime();
-                            if (!devices[deviceId].lastSyncTime || nowMs - devices[deviceId].lastSyncTime > 10000) {
-                                devices[deviceId].lastSyncTime = nowMs;
-                                client.publish(`${controlDevicePrefix}${deviceId}`, JSON.stringify({
-                                    command: "update_packages",
-                                    packageNames: pcList
-                                }));
+                            const installed = devices[deviceId].installedClients || [];
+                            const validPcList = pcList.filter(p => installed.includes(p));
+                            if (validPcList.length > 0 && validPcList.length === pcList.length) {
+                                const nowMs = new Date().getTime();
+                                if (!devices[deviceId].lastSyncTime || nowMs - devices[deviceId].lastSyncTime > 10000) {
+                                    devices[deviceId].lastSyncTime = nowMs;
+                                    client.publish(`${controlDevicePrefix}${deviceId}`, JSON.stringify({
+                                        command: "update_packages",
+                                        packageNames: pcList
+                                    }));
+                                }
                             }
                         }
                     }
