@@ -526,8 +526,7 @@ def launch_roblox(package_name):
     log_event(f"Launching {package_name}...")
     
     force_stop_roblox(package_name)
-    os.system("su -c 'pm trim-caches 2000M' </dev/null >/dev/null 2>&1")
-    time.sleep(1)
+    os.system("su -c 'pm trim-caches 2000M &' </dev/null >/dev/null 2>&1")
     
     link = pkg_link.strip() if pkg_link else ""
     if link:
@@ -543,13 +542,17 @@ def launch_roblox(package_name):
 
 def update_targeted_packages(packages):
     global targeted_packages
-    if sorted(targeted_packages) == sorted(packages):
+    installed = get_installed_roblox_packages()
+    valid = [p for p in packages if p in installed]
+    if not valid:
+        valid = installed
+    if sorted(targeted_packages) == sorted(valid):
         return
-    targeted_packages = packages
+    targeted_packages = valid
     for pkg in list(log_states.keys()):
         if pkg not in targeted_packages:
             log_states.pop(pkg, None)
-    log_event(f"Targeted packages set ({len(packages)})")
+    log_event(f"Targeted packages set ({len(valid)})")
 
 mqtt_client = mqtt.Client()
 
@@ -827,4 +830,3 @@ except KeyboardInterrupt:
     print("[*] Exiting script...")
     mqtt_client.loop_stop()
     sys.exit(0)
-
