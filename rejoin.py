@@ -255,8 +255,9 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
+        cpu_ram_val = f"Cpu:{cpu_p}% | Ram:{ram_str}"
         print(f" {colors['cyan']}╔═════════════════════════════════╗{colors['reset']}")
-        print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Cpu:{colors['reset']}{cpu_p:<5}%│{colors['bold']}Ram:{colors['reset']}{ram_str:<17}{colors['cyan']}║{colors['reset']}")
+        print(f" {colors['cyan']}║{colors['reset']} {cpu_ram_val:<31} {colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}╠═════════════════════════════════╣{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<19}{colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Status:{colors['reset']}      {status_color}{status_text:<19}{colors['reset']}{colors['cyan']}║{colors['reset']}")
@@ -328,7 +329,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2100
+SCRIPT_VERSION = 2110
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
