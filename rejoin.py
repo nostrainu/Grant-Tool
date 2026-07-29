@@ -526,6 +526,7 @@ def launch_roblox(package_name):
     log_event(f"Launching {package_name}...")
     
     force_stop_roblox(package_name)
+    os.system("su -c 'pm trim-caches 2000M' </dev/null >/dev/null 2>&1")
     time.sleep(1)
     
     link = pkg_link.strip() if pkg_link else ""
@@ -766,6 +767,7 @@ if is_paused:
     print(f"{colors['gray']}[*] Cleaning up any leftover Roblox processes on startup...{colors['reset']}")
     for pkg in get_installed_roblox_packages():
         force_stop_roblox(pkg)
+    os.system("su -c 'pm trim-caches 2000M' </dev/null >/dev/null 2>&1")
     log_event("Startup cleanup completed.")
 else:
     log_event("Standalone cycle active. Skipping cleanup.")
