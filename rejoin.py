@@ -183,169 +183,92 @@ def get_sys_stats():
 
     return round(cpu_pct, 1), round(used_gb, 2), round(total_gb, 2)
 
+ui_lock = threading.Lock()
+
 def draw_termux_ui():
-    try:
-        sys.stdout.write("\033[H\033[2J\033[3J")
-        sys.stdout.flush()
-        
-        cpu_p, used_ram, total_ram = get_sys_stats()
-        ram_str = f"{used_ram:.2f}/{total_ram:.2f}G"
+    with ui_lock:
+        try:
+            os.system("stty sane 2>/dev/null")
+            cpu_p = get_cpu_usage()
+            ram_used, ram_total, ram_pct = get_ram_usage()
+            ram_str = f"{ram_used:.2f}/{ram_total:.2f}G"
 
-        status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
-        status_color = colors['yellow'] if is_paused else colors['green']
-        
-        auto_text = ""
-        auto_color = colors['gray']
-        if is_paused:
-            auto_text = "PAUSED"
-            auto_color = colors['yellow']
-        else:
-            now_ts = time.time()
-            min_rem = None
-            active_interval = None
+            status_text = "PAUSED / STOPPED" if is_paused else "ACTIVE & MONITORING"
+            status_color = colors['yellow'] if is_paused else colors['green']
+
+            auto_text = "Disabled"
+            auto_color = colors['gray']
+            if is_paused:
+                auto_text = "PAUSED"
+                auto_color = colors['yellow']
+
+            box_w = 21
+            inner_w = 19
+
+            top_border = f"╔{'═' * inner_w}╗"
+            mid_border = f"╠{'═' * inner_w}╣"
+            bot_border = f"╚{'═' * inner_w}╝"
+
+            print("\033[H\033[2J\r", end="")
+            print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
             
-            for pkg in targeted_packages:
-                ov = client_overrides.get(pkg, {}) if isinstance(client_overrides, dict) else {}
-                interval_sec = None
-                if isinstance(ov, dict):
-                    interval_sec = ov.get("cycleIntervalSeconds")
-                    if not interval_sec and ov.get("cycleIntervalMinutes"):
-                        interval_sec = int(ov.get("cycleIntervalMinutes") * 60)
-                if not interval_sec:
-                    auto_min = config.get("autoRejoinIntervalMinutes", 0)
-                    if auto_min and auto_min > 0:
-                        interval_sec = int(auto_min * 60)
-                
-                if interval_sec and interval_sec > 0:
-                    last_c = ov.get("lastCycleTime", 0) if isinstance(ov, dict) else 0
-                    last_c_ts = 0
-                    if isinstance(last_c, (int, float)):
-                        last_c_ts = last_c
-                    elif isinstance(last_c, str):
-                        try:
-                            if last_c.replace('.', '', 1).isdigit():
-                                last_c_ts = float(last_c)
-                            else:
-                                import datetime
-                                dt = datetime.datetime.fromisoformat(last_c.replace('Z', '+00:00'))
-                                last_c_ts = dt.timestamp()
-                        except Exception:
-                            last_c_ts = 0
+            cpu_ram_val = f"Cpu:{cpu_p}%│Ram:{ram_str.split('/')[0]}"
+            if len(cpu_ram_val) > inner_w:
+                cpu_ram_val = cpu_ram_val[:inner_w]
+            print(f"\r {colors['cyan']}║{colors['reset']}{cpu_ram_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
+            
+            print(f"\r {colors['cyan']}{mid_border}{colors['reset']}")
+            
+            dev_val = f"Dev:{device_id.replace('device_', '')}"
+            if len(dev_val) > inner_w:
+                dev_val = dev_val[:inner_w]
+            print(f"\r {colors['cyan']}║{colors['reset']}{dev_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
+            
+            stat_val = f"State:{status_text}"
+            if len(stat_val) > inner_w:
+                stat_val = stat_val[:inner_w]
+            print(f"\r {colors['cyan']}║{colors['reset']}{status_color}{stat_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+            
+            auto_val = f"Auto:{auto_text}"
+            if len(auto_val) > inner_w:
+                auto_val = auto_val[:inner_w]
+            print(f"\r {colors['cyan']}║{colors['reset']}{auto_color}{auto_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+            
+            print(f"\r {colors['cyan']}{bot_border}{colors['reset']}\n")
 
-                    if last_c_ts > 0:
-                        rem = max(0, interval_sec - int(now_ts - last_c_ts))
-                        if min_rem is None or rem < min_rem:
-                            min_rem = rem
-                            active_interval = interval_sec
-                    else:
-                        min_rem = 0
-                        active_interval = interval_sec
+            installed = get_installed_roblox_packages()
+            if installed:
+                max_name_len = 10
+                for p in installed:
+                    u = user_ids_cache.get(p, "Unknown")
+                    d = u if u and u != "Unknown" else p
+                    if len(d) > max_name_len:
+                        max_name_len = len(d)
+                name_w = max_name_len + 1
 
-            if min_rem is not None and active_interval:
-                m_label = f"{int(active_interval / 60)}m" if active_interval % 60 == 0 else f"{active_interval / 60:.1f}m"
-                if min_rem < 60:
-                    rem_str = f"{min_rem}s"
-                else:
-                    r_m = min_rem // 60
-                    r_s = min_rem % 60
-                    rem_str = f"{r_m}:{r_s:02d}"
-                auto_text = f"{m_label} (Next: {rem_str})"
-                auto_color = colors['green']
+                for pkg in installed:
+                    is_run = check_roblox_running(pkg)
+                    is_target = pkg in targeted_packages
+                    uid = user_ids_cache.get(pkg, "Unknown")
+                    status_str = f"{colors['green']}[RUNNING]{colors['reset']}" if is_run else f"{colors['red']}[STOPPED]{colors['reset']}"
+                    target_str = f"[{colors['green']}X{colors['reset']}]" if is_target else "[ ]"
+                    disp_name = uid if uid and uid != "Unknown" else pkg
+                    pkg_short = pkg.split('.')[-1]
+                    disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
+                    pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
+                    print(f"\r   {target_str} {disp_padded} {pkg_formatted} - {status_str}")
             else:
-                auto_text = "Disabled"
-                auto_color = colors['gray']
+                print(f"\r   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
-        os.system("stty sane 2>/dev/null")
-        box_w = 21
-        inner_w = 19
-
-        top_border = f"╔{'═' * inner_w}╗"
-        mid_border = f"╠{'═' * inner_w}╣"
-        bot_border = f"╚{'═' * inner_w}╝"
-
-        print("\033[H\033[2J\r", end="")
-        print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
-        
-        cpu_ram_val = f"Cpu:{cpu_p}%│Ram:{ram_str.split('/')[0]}"
-        if len(cpu_ram_val) > inner_w:
-            cpu_ram_val = cpu_ram_val[:inner_w]
-        print(f"\r {colors['cyan']}║{colors['reset']}{cpu_ram_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
-        
-        print(f"\r {colors['cyan']}{mid_border}{colors['reset']}")
-        
-        dev_val = f"Dev:{device_id.replace('device_', '')}"
-        if len(dev_val) > inner_w:
-            dev_val = dev_val[:inner_w]
-        print(f"\r {colors['cyan']}║{colors['reset']}{dev_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
-        
-        stat_val = f"State:{status_text}"
-        if len(stat_val) > inner_w:
-            stat_val = stat_val[:inner_w]
-        print(f"\r {colors['cyan']}║{colors['reset']}{status_color}{stat_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
-        
-        auto_val = f"Auto:{auto_text.split(' ')[0]}"
-        if len(auto_val) > inner_w:
-            auto_val = auto_val[:inner_w]
-        print(f"\r {colors['cyan']}║{colors['reset']}{auto_color}{auto_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
-        
-        print(f"\r {colors['cyan']}{bot_border}{colors['reset']}\n")
-
-        installed = get_installed_roblox_packages()
-        if installed:
-            max_name_len = 10
-            for p in installed:
-                u = user_ids_cache.get(p, "Unknown")
-                d = u if u and u != "Unknown" else p
-                if len(d) > max_name_len:
-                    max_name_len = len(d)
-            name_w = max_name_len + 1
-
-            for pkg in installed:
-                is_run = check_roblox_running(pkg)
-                is_target = pkg in targeted_packages
-                uid = user_ids_cache.get(pkg, "Unknown")
-                status_str = f"{colors['green']}[RUNNING]{colors['reset']}" if is_run else f"{colors['red']}[STOPPED]{colors['reset']}"
-                target_str = f"[{colors['green']}X{colors['reset']}]" if is_target else "[ ]"
-                disp_name = uid if uid and uid != "Unknown" else pkg
-                pkg_short = pkg.split('.')[-1]
-                
-                cycle_tag_fmt = ""
-                override = client_overrides.get(pkg, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
-                if isinstance(override, dict) and override.get("privateServerList"):
-                    ps_list = override.get("privateServerList", [])
-                    if len(ps_list) > 0:
-                        idx = (override.get("currentPSIndex", 0) or 0) + 1
-                        total = len(ps_list)
-                        interval_sec = override.get("cycleIntervalSeconds")
-                        if not interval_sec and override.get("cycleIntervalMinutes"):
-                            interval_sec = int(override.get("cycleIntervalMinutes") * 60)
-                        
-                        if interval_sec:
-                            if interval_sec < 60:
-                                t_str = f"{interval_sec}s"
-                            else:
-                                m = interval_sec / 60
-                                t_str = f"{int(m)}m" if m.is_integer() else f"{m:.1f}m"
-                            cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total} | {t_str}]{colors['reset']}"
-                        else:
-                            cycle_tag_fmt = f" {colors['magenta']}[PS #{idx}/{total}]{colors['reset']}"
-                            
-                disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
-                pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
-                
-                print(f"\r   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
-        else:
-            print(f"\r   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
-
-        print(f"\r\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
-        if recent_logs:
-            for item in recent_logs:
-                clean_item = item if len(item) <= 42 else item[:39] + "..."
-                print(f"\r   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
-        else:
-            print(f"\r   {colors['gray']}No logs yet.{colors['reset']}\n")
-    except Exception:
-        pass
+            print(f"\r\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
+            if recent_logs:
+                for item in recent_logs:
+                    clean_item = item if len(item) <= 42 else item[:39] + "..."
+                    print(f"\r   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
+            else:
+                print(f"\r   {colors['gray']}No logs yet.{colors['reset']}\n")
+        except Exception:
+            pass
 
 def log_event(msg):
     global last_logged_event, last_log_time
@@ -355,7 +278,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2160
+SCRIPT_VERSION = 2170
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
