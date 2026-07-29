@@ -236,7 +236,12 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
-        print(f" {colors['cyan']}╔═════════════════════════════════╗{colors['reset']}")
+        title_str = " GRANT MOBILE "
+        inner_w = 33
+        pad_l = (inner_w - len(title_str)) // 2
+        pad_r = inner_w - len(title_str) - pad_l
+        top_border = f"╔{'═' * pad_l}{colors['bold']}{colors['yellow']}{title_str}{colors['reset']}{colors['cyan']}{'═' * pad_r}╗"
+        print(f" {colors['cyan']}{top_border}{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Cpu:{colors['reset']}{cpu_p:<5}%│{colors['bold']}Ram:{colors['reset']}{ram_str:<17}{colors['cyan']}║{colors['reset']}")
         print(f" {colors['cyan']}╠═════════════════════════════════╣{colors['reset']}")
         print(f" {colors['cyan']}║{colors['reset']} {colors['bold']}Device ID:{colors['reset']}   {device_id:<19}{colors['cyan']}║{colors['reset']}")
@@ -309,7 +314,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2050
+SCRIPT_VERSION = 3300
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
