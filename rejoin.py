@@ -32,6 +32,85 @@ def get_installed_roblox_packages():
             pass
     return sorted(list(packages))
 
+running_states_cache = {}
+user_ids_cache = {}
+last_launch_time = {}
+
+def update_running_states_cache():
+    global running_states_cache
+    ps_out = ""
+    for cmd in ["su -c 'ps -ef || ps -A || ps'", "ps -ef", "ps -A", "ps"]:
+        try:
+            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
+            if out and len(out.strip()) > 0:
+                ps_out += "\n" + out
+        except Exception:
+            pass
+    
+    new_cache = {}
+    for pkg in get_installed_roblox_packages():
+        pkg_short = pkg[:15]
+        pkg_suffix = pkg.split('.')[-1]
+        is_run = (pkg in ps_out) or (pkg_short in ps_out) or (pkg_suffix in ps_out)
+        new_cache[pkg] = is_run
+    running_states_cache = new_cache
+
+def check_roblox_running(package_name):
+    return running_states_cache.get(package_name, False)
+
+def force_stop_roblox(package_name):
+    cmds = [
+        f"am force-stop {package_name}",
+        f"su -c 'am force-stop {package_name}'",
+        f"su -c 'pkill -9 -f {package_name}'"
+    ]
+    for cmd in cmds:
+        try:
+            os.system(f"{cmd} </dev/null >/dev/null 2>&1")
+        except Exception:
+            pass
+
+def launch_roblox(package_name):
+    force_stop_roblox(package_name)
+    time.sleep(2)
+    ps_url = config.get("privateServerLink", "")
+    place_id_val = config.get("placeId", 0)
+    
+    override = client_overrides.get(package_name, {}) if 'client_overrides' in globals() and isinstance(client_overrides, dict) else {}
+    if isinstance(override, dict) and override.get("privateServerList"):
+        ps_list = override.get("privateServerList", [])
+        if len(ps_list) > 0:
+            idx = override.get("currentPSIndex", 0) or 0
+            ps_url = ps_list[idx % len(ps_list)]
+
+    if ps_url and "privateServerLinkCode=" in ps_url:
+        cmd = f"am start -n {package_name}/com.roblox.client.Activity -a android.intent.action.VIEW -d \"{ps_url}\""
+    else:
+        cmd = f"am start -n {package_name}/com.roblox.client.Activity -a android.intent.action.VIEW -d \"roblox://placeID={place_id_val}\""
+    
+    os.system(f"{cmd} </dev/null >/dev/null 2>&1")
+    os.system(f"su -c '{cmd}' </dev/null >/dev/null 2>&1")
+    last_launch_time[package_name] = time.time()
+
+def protect_process(package_name):
+    try:
+        os.system(f"su -c 'for p in $(pgrep -f {package_name}); do echo -1000 > /proc/$p/oom_score_adj; done' </dev/null >/dev/null 2>&1")
+    except Exception:
+        pass
+
+def get_roblox_username_or_id(package_name):
+    db_path = f"/data/data/{package_name}/databases/ROBLOX.db"
+    try:
+        cmd = f"su -c 'cat {db_path}'"
+        data = subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL)
+        if data:
+            match = re.search(b'([a-zA-Z0-9_]{3,20})\x00.*(?:username|name)', data, re.IGNORECASE)
+            if match:
+                return match.group(1).decode('utf-8', errors='ignore')
+    except Exception:
+        pass
+    return None
+
 colors = {
     "reset": "\033[0m",
     "bold": "\033[1m",
@@ -277,7 +356,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2190
+SCRIPT_VERSION = 2200
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
