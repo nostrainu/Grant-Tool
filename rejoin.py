@@ -207,7 +207,7 @@ def draw_termux_ui():
             mid_border = f"╠{'═' * inner_w}╣"
             bot_border = f"╚{'═' * inner_w}╝"
 
-            print("\033[H\033[2J\r", end="")
+            print("\033[H\033[2J\r", end="", flush=True)
             print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
             
             cpu_ram_val = f"Cpu:{cpu_p}%│Ram:{ram_str.split('/')[0]}"
@@ -265,6 +265,7 @@ def draw_termux_ui():
                     print(f"\r   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
             else:
                 print(f"\r   {colors['gray']}No logs yet.{colors['reset']}\n")
+            sys.stdout.flush()
         except Exception:
             pass
 
@@ -276,7 +277,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2180
+SCRIPT_VERSION = 2190
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
