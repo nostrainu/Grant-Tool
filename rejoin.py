@@ -8,10 +8,29 @@ import paho.mqtt.client as mqtt
 import threading
 import re
 import urllib.request
-import ssl
 import sqlite3
 
-
+def get_installed_roblox_packages():
+    packages = set()
+    cmds = [
+        "pm list packages -3",
+        "pm list packages",
+        "su -c 'pm list packages -3' < /dev/null",
+        "su -c 'pm list packages' < /dev/null"
+    ]
+    for cmd in cmds:
+        try:
+            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
+            for line in out.splitlines():
+                line_str = line.strip()
+                if line_str.startswith("package:"):
+                    pkg = line_str.replace("package:", "").strip()
+                    pkg_lower = pkg.lower()
+                    if any(k in pkg_lower for k in ["roblox", "clien", "noka", "free"]):
+                        packages.add(pkg)
+        except Exception:
+            pass
+    return sorted(list(packages))
 
 colors = {
     "reset": "\033[0m",
@@ -309,7 +328,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2060
+SCRIPT_VERSION = 2070
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
@@ -333,28 +352,6 @@ def check_self_update():
         log_event("rejoin.py is up to date.")
     except Exception as e:
         log_event(f"Auto-update skipped: {e}")
-
-def get_installed_roblox_packages():
-    packages = set()
-    cmds = [
-        "pm list packages -3",
-        "pm list packages",
-        "su -c 'pm list packages -3' < /dev/null",
-        "su -c 'pm list packages' < /dev/null"
-    ]
-    for cmd in cmds:
-        try:
-            out = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
-            for line in out.splitlines():
-                line_str = line.strip()
-                if line_str.startswith("package:"):
-                    pkg = line_str.replace("package:", "").strip()
-                    pkg_lower = pkg.lower()
-                    if any(k in pkg_lower for k in ["roblox", "clien", "noka", "free"]):
-                        packages.add(pkg)
-        except Exception:
-            pass
-    return sorted(list(packages))
 
 raw_tp = config.get("targetedPackages", [])
 installed_on_start = get_installed_roblox_packages()
@@ -461,8 +458,6 @@ def protect_process(package_name):
     except Exception:
         pass
 
-
-
 def get_roblox_username_or_id(package_name):
     app_storage_path = f"/data/data/{package_name}/files/appData/LocalStorage/appStorage.json"
     try:
@@ -481,8 +476,6 @@ def get_roblox_username_or_id(package_name):
     if "noka" in package_name.lower():
         return f"Noka {last_char}"
     return f"Client {last_char}"
-
-
 
 def check_roblox_running(package_name):
     return running_states_cache.get(package_name, False)
