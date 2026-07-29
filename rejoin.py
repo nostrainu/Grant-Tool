@@ -255,6 +255,7 @@ def draw_termux_ui():
                 auto_text = "Disabled"
                 auto_color = colors['gray']
 
+        os.system("stty sane 2>/dev/null")
         box_w = 21
         inner_w = 19
 
@@ -262,32 +263,32 @@ def draw_termux_ui():
         mid_border = f"╠{'═' * inner_w}╣"
         bot_border = f"╚{'═' * inner_w}╝"
 
-        print("\033[H\033[2J", end="")
-        print(f" {colors['cyan']}{top_border}{colors['reset']}")
+        print("\033[H\033[2J\r", end="")
+        print(f"\r {colors['cyan']}{top_border}{colors['reset']}")
         
         cpu_ram_val = f"Cpu:{cpu_p}%│Ram:{ram_str.split('/')[0]}"
         if len(cpu_ram_val) > inner_w:
             cpu_ram_val = cpu_ram_val[:inner_w]
-        print(f" {colors['cyan']}║{colors['reset']}{cpu_ram_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
+        print(f"\r {colors['cyan']}║{colors['reset']}{cpu_ram_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
         
-        print(f" {colors['cyan']}{mid_border}{colors['reset']}")
+        print(f"\r {colors['cyan']}{mid_border}{colors['reset']}")
         
         dev_val = f"Dev:{device_id.replace('device_', '')}"
         if len(dev_val) > inner_w:
             dev_val = dev_val[:inner_w]
-        print(f" {colors['cyan']}║{colors['reset']}{dev_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
+        print(f"\r {colors['cyan']}║{colors['reset']}{dev_val:<{inner_w}}{colors['cyan']}║{colors['reset']}")
         
         stat_val = f"State:{status_text}"
         if len(stat_val) > inner_w:
             stat_val = stat_val[:inner_w]
-        print(f" {colors['cyan']}║{colors['reset']}{status_color}{stat_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+        print(f"\r {colors['cyan']}║{colors['reset']}{status_color}{stat_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
         
         auto_val = f"Auto:{auto_text.split(' ')[0]}"
         if len(auto_val) > inner_w:
             auto_val = auto_val[:inner_w]
-        print(f" {colors['cyan']}║{colors['reset']}{auto_color}{auto_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
+        print(f"\r {colors['cyan']}║{colors['reset']}{auto_color}{auto_val:<{inner_w}}{colors['reset']}{colors['cyan']}║{colors['reset']}")
         
-        print(f" {colors['cyan']}{bot_border}{colors['reset']}\n")
+        print(f"\r {colors['cyan']}{bot_border}{colors['reset']}\n")
 
         installed = get_installed_roblox_packages()
         if installed:
@@ -332,17 +333,17 @@ def draw_termux_ui():
                 disp_padded = f"{colors['bold']}{disp_name:<{name_w}}{colors['reset']}"
                 pkg_formatted = f"{colors['gray']}({pkg_short}){colors['reset']}"
                 
-                print(f"   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
+                print(f"\r   {target_str} {disp_padded}{cycle_tag_fmt}{pkg_formatted} - {status_str}")
         else:
-            print(f"   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
+            print(f"\r   {colors['gray']}No Roblox clone packages found.{colors['reset']}")
 
-        print(f"\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
+        print(f"\r\n {colors['bold']}{colors['cyan']}RECENT ACTIVITY LOGS:{colors['reset']}")
         if recent_logs:
             for item in recent_logs:
                 clean_item = item if len(item) <= 42 else item[:39] + "..."
-                print(f"   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
+                print(f"\r   {colors['green']}\u2022{colors['reset']} {colors['gray']}{clean_item}{colors['reset']}")
         else:
-            print(f"   {colors['gray']}No logs yet.{colors['reset']}\n")
+            print(f"\r   {colors['gray']}No logs yet.{colors['reset']}\n")
     except Exception:
         pass
 
@@ -354,7 +355,7 @@ def log_event(msg):
     recent_logs.append(f"[{t_str}] {msg}")
     draw_termux_ui()
 
-SCRIPT_VERSION = 2150
+SCRIPT_VERSION = 2160
 RAW_GITHUB_URL = "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py"
 
 def check_self_update():
