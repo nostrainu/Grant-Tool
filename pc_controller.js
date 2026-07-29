@@ -1042,10 +1042,16 @@ async function main() {
                         command: "update_packages",
                         packageNames: devices[deviceId].activeClients
                     }));
-                } else {
                     devices[deviceId].installedClients = payload.installedClients || [];
                     if (savedTargets) {
-                        devices[deviceId].activeClients = [...savedTargets];
+                        const validTargets = savedTargets.filter(p => devices[deviceId].installedClients.includes(p));
+                        if (validTargets.length > 0) {
+                            devices[deviceId].activeClients = validTargets;
+                        } else {
+                            devices[deviceId].activeClients = [...devices[deviceId].installedClients];
+                        }
+                    } else {
+                        devices[deviceId].activeClients = [...devices[deviceId].installedClients];
                     }
                     devices[deviceId].lastSeen = new Date();
                     devices[deviceId].state = "ONLINE";
