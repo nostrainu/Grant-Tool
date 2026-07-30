@@ -20,7 +20,7 @@
 
 ### 1️⃣ PC Dashboard Setup
 
-1. Download the latest **`Grant-v2.0.zip`** from [Releases](https://github.com/nostrainu/Grant-Tool/releases).
+1. Download the latest **`Grant-v3.0.zip`** from [Releases](https://github.com/nostrainu/Grant-Tool/releases).
 2. Extract the zip folder anywhere on your PC.
 3. Double-click **`GrantRejoiner.bat`**.
    - *First run will automatically install Node dependencies (`npm install`) and create default configs.*
@@ -30,15 +30,19 @@
 
 ### 2️⃣ Mobile Client Setup (Termux)
 
-Open **Termux** on your RedFinger / Android VM and run the following commands:
+Open **Termux** on your RedFinger / Android VM:
 
-#### **Step A: Install Dependencies & Download Script**
+#### **Step A: Install Dependencies**
 ```bash
 pkg install python -y && pip install paho-mqtt
+```
+
+#### **Step B: Download Script**
+```bash
 curl -sL "https://raw.githubusercontent.com/nostrainu/Grant-Tool/main/rejoin.py?t=$(date +%s)" -o rejoin.py
 ```
 
-#### **Step B: Connect to PC Dashboard**
+#### **Step C: Connect to PC Dashboard**
 *Replace `YOUR_ROOM_CODE` with the Room Code displayed on your PC Dashboard:*
 ```bash
 echo '{"connectionCode":"YOUR_ROOM_CODE"}' > config.json
