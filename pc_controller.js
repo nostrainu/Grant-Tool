@@ -135,7 +135,7 @@ function loadConfig() {
             console.log(" [*] Warning: config.json was corrupted or invalid. Resetting to default configuration...");
         }
     }
-    
+
     if (!loadedSuccess) {
         config = {
             connectionCode: "YOUR_UNIQUE_CONNECTION_CODE",
@@ -149,9 +149,9 @@ function loadConfig() {
         };
         try {
             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-        } catch (e) {}
+        } catch (e) { }
     }
-    
+
     if (config.autoRejoinIntervalMinutes === undefined) config.autoRejoinIntervalMinutes = 0;
     if (config.clientOverrides === undefined) config.clientOverrides = {};
     if (config.deviceTargets === undefined) config.deviceTargets = {};
@@ -562,7 +562,7 @@ async function main() {
         }
 
         printInnerLine(`${colors.gray}${"─".repeat(innerWidth - 4)}${colors.reset}`);
-        
+
         const totalPages = Math.ceil(deviceIds.length / 4) || 1;
         if (currentDevicePage >= totalPages) currentDevicePage = 0;
 
@@ -583,7 +583,7 @@ async function main() {
                     } else if (dev.isPaused === false) {
                         const devIntervalMins = config.autoRejoinIntervalMinutes || 0;
                         let latestLaunchTs = dev.lastLaunchTime || 0;
-                        
+
                         const devObj = (config.clientOverrides && config.clientOverrides[id]) || {};
                         Object.keys(devObj).forEach(pKey => {
                             const cObj = devObj[pKey];
@@ -597,7 +597,7 @@ async function main() {
                                 if (cTs > latestLaunchTs) latestLaunchTs = cTs;
                             }
                         });
-                        
+
                         if (devIntervalMins > 0 && latestLaunchTs > 0) {
                             const elapsedSecs = Math.max(0, Math.floor(now.getTime() / 1000 - latestLaunchTs));
                             const remainingSecs = Math.max(0, (devIntervalMins * 60) - elapsedSecs);
@@ -1241,10 +1241,10 @@ async function main() {
             } else {
                 console.log(`  ${colors.bold}Total RAM Accounts Detected:${colors.reset} ${accs.length}\n`);
                 accs.forEach((acc, i) => {
-                    const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
+                    const name = acc.Username || acc.Name || acc.username || `Account #${i + 1}`;
                     const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
                     const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
-                    console.log(`   [${i+1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
+                    console.log(`   [${i + 1}] ${colors.bold}${name.padEnd(25)}${colors.reset} ${cookieState}`);
                 });
             }
         } else {
@@ -1357,7 +1357,7 @@ async function main() {
                     const acc = accs[assignedCount];
                     const cookie = acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY || "";
                     const username = acc.Username || acc.Name || acc.username || "";
-                    
+
                     if (!config.clientOverrides[dev.deviceId][pkg]) config.clientOverrides[dev.deviceId][pkg] = {};
                     if (cookie) config.clientOverrides[dev.deviceId][pkg].cookie = cookie;
                     if (username) config.clientOverrides[dev.deviceId][pkg].username = username;
@@ -1388,7 +1388,7 @@ async function main() {
 
         console.log(`\n ${colors.cyan}╔══════ SELECT RAM ACCOUNT TO LOGIN ═══════════════════════════════════════╗${colors.reset}\n`);
         accs.forEach((acc, i) => {
-            const name = acc.Username || acc.Name || acc.username || `Account #${i+1}`;
+            const name = acc.Username || acc.Name || acc.username || `Account #${i + 1}`;
             const hasCookie = !!(acc.Cookie || acc.cookie || acc.SecurityCookie || acc.ROBLOSECURITY);
             const cookieState = hasCookie ? `${colors.green}[Cookie Ready]${colors.reset}` : `${colors.red}[No Cookie]${colors.reset}`;
             const idxStr = `[${colors.bold}${colors.green}${String(i + 1).padStart(2, ' ')}${colors.reset}]`;
@@ -1435,7 +1435,7 @@ async function main() {
             clients.forEach(pkg => {
                 const pkgClean = pkg.replace('com.roblox.', '').replace('client', 'Client ');
                 const pkgSlot = pkgClean.charAt(0).toUpperCase() + pkgClean.slice(1);
-                
+
                 let activeUser = (dev.userIds && dev.userIds[pkg]) ? dev.userIds[pkg] : "";
                 if (!activeUser || activeUser === "Unknown") {
                     activeUser = "Empty";
