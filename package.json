@@ -1,6 +1,6 @@
 {
   "name": "grant-remote-rejoiner",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Remote-controlled Roblox rejoiner dashboard",
   "main": "pc_controller.js",
   "scripts": {

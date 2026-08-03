@@ -20,7 +20,7 @@
 
 ### 1️⃣ PC Dashboard Setup
 
-1. Download the latest **`Grant-v3.0.zip`** from [Releases](https://github.com/nostrainu/Grant-Tool/releases).
+1. Download the latest **`Grant-v4.0.zip`** from [Releases](https://github.com/nostrainu/Grant-Tool/releases).
 2. Extract the zip folder anywhere on your PC.
 3. Double-click **`GrantRejoiner.bat`**.
    - *First run will automatically install Node dependencies (`npm install`) and create default configs.*
